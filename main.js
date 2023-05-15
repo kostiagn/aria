@@ -203,7 +203,7 @@ const colorGrading = {
         curveEl.removeClass('hide')
         const parent = curveEl.parent();
 
-        const curveHeight = parent.height() - curveMargin * 2;
+        const curveHeight = Math.floor(parent.height()) - curveMargin * 2;
         const curveWidth = curveHeight * 3;
         curveEl.width(curveWidth + curveMargin * 2);
         curveEl.height(parent.height());

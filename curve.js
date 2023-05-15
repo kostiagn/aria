@@ -134,7 +134,7 @@ function Curve(canvasEl, name, width, height) {
         if (event.target.nodeName == 'circle' && event.which === 3) {
             const index = getPointIndex(event.target.id);
             if (index > 0 && index < points.length - 1) {
-                target.parentNode.remove();
+                target.remove();
                 points.splice(index, 1);
                 drawPath();
             }
