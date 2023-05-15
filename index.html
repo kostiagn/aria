@@ -1,0 +1,521 @@
+<html>
+<head>
+    <script src="jquery.min.js"></script>
+    <script src="main.js"></script>
+    
+    <link href="main.css"  rel="stylesheet" media="all" type="text/css">
+</head>
+    <body>
+        <canvas id="myCanvas">
+        </canvas>
+
+        
+        <svg id="mainCanvas" width="600" height="360">
+            <defs>
+              <svg x="0" y="0" id="p-template">
+                <circle class="point" r="6" cx="10" cy="10"/>
+              
+            </svg>
+              <pattern id="Pat01" width="10" height="10" patternUnits="userSpaceOnUse">
+                    <rect width="10" height="10" fill="#FFFFFF" stroke="#000000" stroke-width="0.1"/>
+                </pattern>
+            </defs>
+            <rect id="net" fill="url(#Pat01)"/>
+            <path stroke-dasharray="2 2" stroke-width="0.5" stroke="none" fill="none" d="M20,50 H320 V350 H20 Z"/>
+            <path  fill="none" id="control-path" stroke="#E8C48E" d="M20,350 L166,154 320,350 "/>
+            <path  stroke="red" fill="none" id="bezier-path" stroke-width="1.2" d="M20,350 Q166,154 320,350 "/>
+            <path d="" fill="none" id="t-path-template"/>
+
+
+        </svg>
+    
+
+
+<script>
+  $(document).ready(docReady);
+  let mainCanvas 
+  let isPointDraging = false;
+  let dragingPointIndex;
+  let dragingPoint;
+  let points = [];
+  let nextPointId = 0;
+  const netMargin = 20;
+  let pointShift = 0;
+  let circleShift = 0;
+  let box = {}
+    
+  let bezierPath;
+  let controlPath;
+  let hideMiddleControlPath = false;
+  const minDistance = 20;
+
+  function docReady() {
+
+    mainCanvas = document.getElementById('mainCanvas');
+    const net = document.getElementById('net');
+    box = {left: 0, top: 0, right:  mainCanvas.getAttribute('width') - netMargin*2, bottom:  mainCanvas.getAttribute('height') - netMargin*2 };
+    net.setAttribute('height', mainCanvas.getAttribute('height') - netMargin*2);
+    net.setAttribute('width', mainCanvas.getAttribute('width') - netMargin*2);
+    net.setAttribute('x', netMargin);
+    net.setAttribute('y', netMargin);
+    circleShift = $('#p-template circle').attr('cx');
+    pointShift = netMargin - circleShift;
+    init();
+//    drawPath();
+
+    mainCanvas.oncontextmenu = () => { return false; }
+
+    $(mainCanvas).mousedown(event=>{
+      event.stopPropagation();
+      event.preventDefault();
+      if (event.which === 1) {
+        let id = event.target.id;
+        if (event.target.nodeName !== 'circle') {
+          const {x,y} = getPointPos(event);
+          const newPoint = addPoint(x,y);
+          drawPath();
+          id = newPoint.id;
+        } 
+        isPointDraging = true;
+        dragingPointIndex = getPointIndex(id);
+        dragingPoint = document.getElementById(id).parentNode;
+      }
+      
+      return false;
+    });
+    $(mainCanvas).mousemove(event => {
+      if (event.buttons === 0) {
+        isPointDraging = false;
+      }
+      if (!isPointDraging) return;
+      
+      const point = points[dragingPointIndex];
+      let {x,y} = getPointPos(event);
+
+      if (x < 0) x = 0;
+      if (y < 0) y = 0;
+      if (x > box.right) x = box.right;
+      if (y > box.bottom) x = box.bottom;
+      if (dragingPointIndex === 0) x = 0;
+      else if (dragingPointIndex === points.length - 1) x = box.right;
+      else {
+        if (x < points[dragingPointIndex - 1].x + minDistance) x =  points[dragingPointIndex - 1].x + minDistance; 
+        if (x > points[dragingPointIndex + 1].x - minDistance) x =  points[dragingPointIndex + 1].x - minDistance; 
+      }
+
+      if (x != point.x || y != point.y) {
+        point.x = x;
+        point.y = y;
+        setPointCoords(dragingPoint, point);
+        drawPath();
+      }
+      
+    })
+
+    $(mainCanvas).mouseup(event=>{
+      event.stopPropagation();
+      event.preventDefault();
+      
+      if (isPointDraging) {
+        isPointDraging = false;
+        return false;
+      }
+      
+      const target = event.target;
+      const {x,y} = getPointPos(event);
+      if (event.target.nodeName == 'circle' && event.which === 3) {
+        const index = getPointIndex(event.target.id);
+        if (index > 0 && index < points.length - 1) {
+          target.parentNode.remove();
+          points.splice(index,1);
+          drawPath();
+        }
+      }
+      return false;
+    })
+    drawGraphic();
+  }
+  function getPointPos(event) {
+    let pos = getMousePos(event);
+    pos.x -= circleShift;
+    pos.y -= circleShift;
+    return pos;
+  }
+  
+  var graphicPoint = [
+	  0, -80, 40, 40, -20, 60, -60, -20, 0, 40,  0, 80, -60, 0, 20, 0
+  ];
+
+var canvasGraphicSettings = {
+	xShift:        0,
+	yShift:        0,
+	xStretch:      1,
+	yStretch:      1,
+	paddingTop:    10,
+	paddingBottom: 10,
+	paddingRight:  10,
+	paddingLeft:   10
+};
+
+
+function setCanvasGraphicSettings(canvasId) {
+	var maxY, minY;
+	var canvas = document.getElementById(canvasId);
+	
+	// canvas.width = window.innerWidth - 20;
+	// canvas.height = window.innerHeight - 20;
+    canvas.width = 800;
+    canvas.height= 400;
+	
+	if (graphicPoint.length > 0) {
+		maxY = graphicPoint[0];
+		minY = graphicPoint[0];
+		
+		for (var i = 0; i < graphicPoint.length; i++) {
+			if (maxY < graphicPoint[i]) {
+				maxY = graphicPoint[i];
+			} else if (minY > graphicPoint[i]) {
+				minY = graphicPoint[i];
+			}
+		}
+		
+		canvasGraphicSettings.xStretch = (canvas.width - canvasGraphicSettings.paddingRight - canvasGraphicSettings.paddingLeft) / (graphicPoint.length - 1);
+		if (maxY != minY) {
+			canvasGraphicSettings.yStretch = (canvas.height - canvasGraphicSettings.paddingTop - canvasGraphicSettings.paddingBottom) / (maxY - minY);
+		} else {
+			canvasGraphicSettings.yStretch = 1;
+		}
+		
+		canvasGraphicSettings.xShift = canvasGraphicSettings.paddingLeft;
+		canvasGraphicSettings.yShift = canvasGraphicSettings.paddingBottom - minY * canvasGraphicSettings.yStretch;
+	}
+}
+
+
+function drawAxis(canvasId) {
+	var canvas = document.getElementById(canvasId);
+	var context = canvas.getContext('2d');
+	
+	context.beginPath();
+	
+	context.moveTo(canvasGraphicSettings.paddingLeft, canvasGraphicSettings.paddingTop);
+	context.lineTo(canvasGraphicSettings.paddingLeft, canvas.height - canvasGraphicSettings.paddingBottom);
+	
+	if ((canvas.height - canvasGraphicSettings.yShift >= canvasGraphicSettings.paddingTop) && (canvasGraphicSettings.yShift >= canvasGraphicSettings.paddingBottom)) {
+		context.moveTo(canvasGraphicSettings.paddingLeft, Math.round(canvas.height - canvasGraphicSettings.yShift));
+		context.lineTo(canvas.width - canvasGraphicSettings.paddingRight, Math.round(canvas.height - canvasGraphicSettings.yShift));
+	}
+
+	context.lineWidth = 2;
+	context.strokeStyle = 'black';
+	context.stroke();
+}
+
+
+function getGraphicPointX(pointIndex) {
+	return canvasGraphicSettings.xShift + canvasGraphicSettings.xStretch * pointIndex;
+}
+
+
+function getGraphicPointY(canvas, yPoint) {
+	return canvas.height - canvasGraphicSettings.yShift - canvasGraphicSettings.yStretch * yPoint;
+}
+
+
+function drawGraphicUsingLine(canvasId) {
+	var canvas = document.getElementById(canvasId);
+	var context = canvas.getContext('2d');
+	
+	if (graphicPoint.length > 0) {
+		context.beginPath();
+		context.moveTo(getGraphicPointX(0), getGraphicPointY(canvas, graphicPoint[0]));
+	
+		for (var i = 1; i < graphicPoint.length; i++) {
+			context.lineTo(getGraphicPointX(i), getGraphicPointY(canvas, graphicPoint[i]));
+		}
+		
+		context.lineWidth = 1;
+		context.strokeStyle = 'red';
+		context.stroke();
+	}
+}
+
+
+function drawGraphicUsingBezier(canvasId) {
+	var canvas = document.getElementById(canvasId);
+	var context = canvas.getContext('2d');
+	
+	var xStretch = canvasGraphicSettings.xStretch;
+	var xStretchSqr = xStretch * xStretch;
+	var yA, yB, yC, xA, subYaYb, subYaYc, k, s, xLeft, yLeft, xRight, yRight;
+	
+	context.beginPath();
+	
+	yA = getGraphicPointY(canvas, graphicPoint[0]);
+	yC = getGraphicPointY(canvas, graphicPoint[1]);
+	
+	context.moveTo(getGraphicPointX(0), yA);
+	for (var i = 1; i < graphicPoint.length; i++) {
+		yB = yA;
+		yA = yC;
+		yC = getGraphicPointY(canvas, graphicPoint[i + 1]);
+		
+		xA = getGraphicPointX(i);
+		
+		if (i < graphicPoint.length - 1) {
+			subYaYb = yA - yB;
+			subYaYc = yA - yC;
+			
+			if (subYaYb != subYaYc) {
+				k = (Math.sqrt((xStretchSqr + subYaYb * subYaYb) * (xStretchSqr + subYaYc * subYaYc)) - xStretchSqr - subYaYb * subYaYc) / (xStretch * (yC - yB));
+			} else {
+				k = 0;
+			}
+			
+			s = xStretch / 2 * Math.sqrt(1 / (1 + k * k));
+			
+			xLeft = xA - s;
+			yLeft = yA - k * s;
+		}
+		
+		//context.moveTo(getGraphicPointX(i - 1), yB);
+		if (i == 1) {
+			context.quadraticCurveTo(xLeft, yLeft, xA, yA);
+		} else if (i < graphicPoint.length - 1) {
+			context.bezierCurveTo(xRight, yRight, xLeft, yLeft, xA, yA);
+		} else {
+			context.quadraticCurveTo(xRight, yRight, xA, yA);
+		}
+		
+		if (i < graphicPoint.length - 1) {
+			xRight = xA + s;
+			yRight = yA + k * s;
+		}
+		
+		//context.moveTo(xLeft, yLeft);
+		//context.lineTo(xRight, yRight);
+	}
+	
+	context.lineWidth = 1;
+	context.strokeStyle = 'blue';
+	context.stroke();
+}
+
+// function drawPoints(canvasId) {
+//     var canvas = document.getElementById(canvasId);
+// 	var context = canvas.getContext('2d');
+	
+	
+	
+// 	for (var i = 1; i < graphicPoint.length; i++) {
+// 		context.lineTo(getGraphicPointX(i), getGraphicPointY(canvas, graphicPoint[i]));
+// 	}
+		
+   
+// }
+
+function drawGraphic() {
+	var canvasId = 'myCanvas';
+	
+	setCanvasGraphicSettings(canvasId);
+	drawAxis(canvasId);
+	
+	drawGraphicUsingLine(canvasId);
+	drawGraphicUsingBezier(canvasId);
+    // drawPoints(canvasId);
+}
+
+
+function init() {    
+    
+
+    
+    document.documentElement.ondragstart = function() {
+      return false;
+    };
+    
+  
+    
+    // read points from ?p=...
+    const mid = box.bottom/2;
+      addPoint(0,box.bottom);
+      addPoint(40,40);
+      addPoint(box.right - 40,30);
+      addPoint(box.right, box.bottom);
+      
+      
+    
+    bezierPath = document.getElementById("bezier-path");
+    controlPath = document.getElementById("control-path");
+    //controlPath.style.display = location.search.match('nocpath=1') ? 'none' : 'block';
+
+    
+    
+    
+    var tPathTemplate = document.getElementById("t-path-template");
+    tPathTemplate.parentNode.removeChild(tPathTemplate);
+    drawPath();
+  }
+
+    function drawPath() {
+      const bezier = calculateSpline(points);
+      
+      let controlPathD = "M" + (points[0].x + netMargin) + ',' + (points[0].y + netMargin) + ' ';
+      let bezierPathD = controlPathD + 'C';
+      
+      controlPathD += 'L';
+
+      for(var i = 1; i < points.length; i++) {       
+        controlPathD += (points[i].x + netMargin)  + ',' + (points[i].y + netMargin) + ' ';
+        bezierPathD  += (points[i].x + netMargin)  + ',' + (points[i].y + netMargin) + ' ';
+      }
+
+      let b2 = 'M';
+      for (var i = 0; i < bezier.length; i++) {
+        b2 += (Math.round(bezier[i].x) + netMargin) + ',' + (Math.round(bezier[i].y) + netMargin) + ' '; 
+        if (i === 0) b2 += 'C';
+      }
+
+      // let x0 = points[0].x + netMargin;
+      // let y0 = points[0].y + netMargin;
+
+      // for (i = 1; i < points.length - 1; i++) {
+      //   const x1 = points[i].x + netMargin;
+      //   const y1 = points[i].y + netMargin;
+      //   const x2 = i === points.length - 2 ? points[i+1].x + netMargin : (x1 + points[i+1].x + netMargin) / 2;
+      //   const y2 = i === points.length - 2 ? points[i+1].y + netMargin : (y1 + points[i+1].y + netMargin) / 2;
+      //   const p = calcBezierPoint(x0,y0,x1,y1,x2,y2);
+      //   bezierPathD += p.x + ',' + p.y + ' ' + x2 + ',' + y2 + ' ';
+      //   x0 = x2;
+      //   y0 = y2;
+      // }
+      console.log(b2);
+       bezierPath.setAttribute('d', b2);
+      controlPath.setAttribute('d', controlPathD);
+
+         
+    }
+
+    function calcBezierPoint(x0,y0,x1,y1,x2,y2) {
+      const l1 = Math.sqrt( (x1-x0)*(x1-x0) + (y1-y0)*(y1-y0));
+      const l2 = Math.sqrt( (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2));
+      const t = l1 / (l1 + l2);
+      const x = (x1 - (1-t)*(1-t)*x0 - t*t*x2) / (2*(1-t)*t);
+      const y = (y1 - (1-t)*(1-t)*y0 - t*t*y2) / (2*(1-t)*t);
+      
+      return {x,y};
+      
+    }
+    function dist(a,b) {
+        return Math.round(Math.sqrt( (a.x-b.x)*(a.x-b.x) + (a.y-b.y)*(a.y-b.y)));
+    }
+    
+    function canAddOrMovePoint(x, index) {
+      return points.findIndex((p, i) => i !== index && p && Math.abs(p.x - x) <= minDistance) < 0;
+    }
+    
+
+    function addPoint(x, y) {
+      if (!canAddOrMovePoint(x)) return;
+      const index = findPointIndex(x);
+      const id = "point-" + (++nextPointId);
+      const newPoint = {x,y,id};
+      points.splice(index,0, newPoint);
+      
+      drawPoint(newPoint);
+      return newPoint;
+    }
+    // draw control points
+    function drawPoints() {
+      points.forEach((_, i) => drawPoint(i));
+    }
+
+    function drawPoint(point) {
+      const p = document.getElementById('p-template').cloneNode(true);
+      
+      p.removeAttribute('id');
+      $(p).find('circle').attr('id', point.id);
+      setPointCoords(p, point);
+      mainCanvas.appendChild(p);
+    }
+    function findPointIndex(x) {
+      const index = points.findIndex(p => p.x > x);
+      return index === -1 ? points.length : index;
+    }
+    
+    // control points coords are shifted from Left-Upper corner a bit
+    // to give them space to render
+    function setPointCoords(el, point) {
+      el.setAttribute('x', point.x + pointShift);
+      el.setAttribute('y', point.y + pointShift);
+    }
+    
+   
+    // draw point connectors which form the curve
+    function drawT(points, t) {
+    
+      var path = document.getElementById('t-'+points.length);
+    
+      if (!path) {
+        path = tPathTemplate.cloneNode(true);
+        path.setAttribute('stroke', ["blue","#0a0","red"][points.length % 3]);
+        path.setAttribute('id', 't-'+points.length);
+        mainCanvas.appendChild(path);
+      }
+    
+      var subPoints = [];
+      var x = points[0].x + (points[1].x - points[0].x)*t;
+      var y = points[0].y + (points[1].y - points[0].y)*t;
+    
+      var tPathD = "M" + x + ',' + y + ' L';
+      subPoints.push({x: x, y: y});
+    
+      for(var i=1; i<points.length-1; i++) {
+        var x = points[i].x + (points[i+1].x - points[i].x)*t;
+        var y = points[i].y + (points[i+1].y - points[i].y)*t;
+        subPoints.push({x: x, y: y});
+    
+        tPathD += x + ',' + y + ' ';
+      }
+    
+      if (points.length <= 3) {
+        var m = document.getElementById('marker');
+        if (t == 1) {
+          var mx = -10, my = -10;
+        } else {
+          mx = subPoints[0].x + (x-subPoints[0].x)*t;
+          my = subPoints[0].y + (y-subPoints[0].y)*t;
+        }
+        m.setAttribute('cx', mx);
+        m.setAttribute('cy', my);
+        path.setAttribute('stroke-width', 2);
+      }
+      if (points.length == 2) {
+        // only 2 points provided, special case
+        tPathD = "M"+points[0].x+","+points[0].y+" L"+x+","+y;
+      }
+    
+      path.setAttribute('d', tPathD);
+    
+      if (subPoints.length > 2){
+        drawT(subPoints, t);
+      }
+    }
+    
+    function getPointIndex(id) {
+      
+      return points.findIndex((p,i)=> p.id === id);
+    }
+
+    function getMousePos (evt) {
+        const pos = evt.currentTarget.getBoundingClientRect();
+        console.log('evt.clientX', evt.clientX, pos.left, pointShift)
+        return {
+            x: evt.clientX - pos.left,
+            y: evt.clientY - pos.top
+        };
+    };
+
+    </script>
+</body>
+</html>

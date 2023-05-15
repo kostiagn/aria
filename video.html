@@ -1,0 +1,211 @@
+<html>
+
+<head>
+    <style>
+        video {
+            background: #222;
+            margin: 0 0 20px 0;
+            width: 600px;
+            height: 400px;
+        }
+
+        #container {
+            margin: 0 auto 0 auto;
+            max-width: 60em;
+            padding: 1em 1.5em 1.3em 1.5em;
+        }
+
+        #controls {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        #controls>div {
+            margin: 5;
+            padding: 5;
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 0px;
+        }
+
+        #controls .label {
+            height: 2em;
+        }
+
+        .min-max {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10;
+        }
+
+        .ctrl-value {
+            font-size: 14;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+
+        <video id="gum-local" autoplay="" playsinline=""></video>
+        <br/>
+        <button id="showVideo">Open camera</button>
+
+        <div id="controls">
+
+        </div>
+
+        <button id="refreshControls" onclick="loadProperties(true)" disabled="">Refresh Controls</button>
+
+        <div id="errorMsg"></div>
+
+
+
+    </div>
+</body>
+<script>
+    const constraints = window.constraints = {
+        audio: false,
+        video: true
+    };
+
+    const elements = {
+
+    }
+
+    function handleSuccess(stream) {
+        const video = document.querySelector('video');
+        const videoTracks = stream.getVideoTracks();
+        console.log('Got stream with constraints:', constraints);
+        console.log(`Using video device: ${videoTracks[0].label}`);
+        video.srcObject = stream;
+
+        // make track variable available to browser console.
+        [window.track] = stream.getVideoTracks();
+
+        loadProperties();
+
+        document.querySelector(`button[id=refreshControls]`).disabled = false;
+    }
+
+    function loadProperties(refreshValuesOnly) {
+        const track = window.track;
+        const capabilities = track.getCapabilities();
+        const settings = track.getSettings();
+
+        console.log('Capabilities: ', capabilities);
+        console.log('Settings: ', settings);
+        console.log('getConstraints', track.getConstraints())
+        const controlsEl = document.getElementById('controls');
+        if (!elements.init) {
+            elements.init = true;
+
+            for (property in capabilities) {
+                console.log(property);
+                const prop = capabilities[property];
+                const isArray = Array.isArray(prop);
+                const isRange = typeof prop === 'object' && 'min' in prop && 'max' in prop;
+                if (!isArray && !isRange) {
+                    console.log(`skip prop ${property}`, prop);
+                    continue;
+                }
+
+                let el;
+                let valueEl;
+                if (isArray) {
+                    const newEl = `<div><div class="label">${property}:</div><select name="${property}"></select></div>`;
+                    controlsEl.insertAdjacentHTML('beforeEnd', newEl);
+                    el = document.querySelector(`select[name=${property}]`);
+                    elements[property] = { el };
+                    for (const mode of prop) {
+                        el.insertAdjacentHTML('afterBegin', `<option value="${mode}">${mode}</option>`);
+                    }
+                } else if (isRange) {
+                    const min = capabilities[property].min;
+                    const max = capabilities[property].max;
+                    const step = capabilities[property].step;
+                    const newEl = `<div><div class="label">${property}:</div><div class="ctrl"> <input name="${property}" type="range"></div><div class="min-max"><span>${formatFloat(min)}</span><span class="ctrl-value">???</span><span>${formatFloat(max)}</span></div></div>`;
+                    controlsEl.insertAdjacentHTML('beforeEnd', newEl);
+                    el = document.querySelector(`input[name=${property}]`);
+                    el.min = min;
+                    el.max = max;
+                    el.step = step;
+                    valueEl = el.parentElement.parentElement.getElementsByClassName('ctrl-value')[0];
+                    elements[property] = { el, valueEl };
+                }
+
+                addOnInput(property, el, valueEl);
+            }
+        }
+        for (property in elements) {
+            const obj = elements[property];
+            if (!obj || !obj.el) continue;
+
+
+            obj.el.value = settings[property];
+            if (obj.valueEl) {
+                obj.valueEl.innerHTML = formatFloat(settings[property]);
+            }
+
+        }
+    }
+    function formatFloat(f) {
+        const s = f.toString();
+        let i = s.indexOf('.')
+        if (s.length <= 5 || i < 0) return s;
+        ++i;
+        while (i < s.length && s[i] === '0') {
+            ++i;
+        }
+        if (i === s.length) return s;
+        return s.substring(0, i + 2);
+        return 
+    }
+    function addOnInput(property, el, valueEl) {
+        el.oninput = async event => {
+            try {
+                const constraints = { advanced: [{ [property]: el.value }] };
+                await track.applyConstraints(constraints);
+
+                console.log('Did successfully apply new constraints: ', constraints);
+                console.log('New camera settings: ', track.getSettings());
+                if (valueEl) {
+                    valueEl.innerHTML = formatFloat(el.value);
+                }
+            } catch (err) {
+                console.error('applyConstraints() failed: ', err);
+            }
+        };
+    }
+
+
+    function handleError(error) {
+        if (error.name === 'NotAllowedError') {
+            errorMsg('Permissions have not been granted to use your camera, ' +
+                'you need to allow the page access to your devices in ' +
+                'order for the demo to work.');
+        }
+        errorMsg(`getUserMedia error: ${error.name}`, error);
+    }
+
+    function errorMsg(msg, error) {
+        const errorElement = document.querySelector('#errorMsg');
+        errorElement.innerHTML += `<p>${msg}</p>`;
+        if (typeof error !== 'undefined') {
+            console.error(error);
+        }
+    }
+
+    async function init(e) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            handleSuccess(stream);
+            e.target.disabled = true;
+        } catch (e) {
+            handleError(e);
+        }
+    }
+    document.querySelector('#showVideo').addEventListener('click', e => init(e));
+</script>
+
+</html>
