@@ -1,0 +1,132 @@
+<html>
+
+<head></head>
+
+<body>
+    <button id="openCamera">SUB2r USB3 HD Camera</button>
+    <button id="reloadControls">reload controls</button>
+    <div>fx3 version: <span id="fx3Version">---</span></div>
+    <div>fpga version: <span id="fpgaVersion">---</span></div>
+
+    <div id="ledControls">
+        <div class="ctrl"> <input name="ledRed" type="range" min="0" max="255" value="0" disabled><span
+                class="value"></span></div>
+        <div class="ctrl"> <input name="ledGreen" type="range" min="0" max="255" value="0" disabled><span
+                class="value"></span></div>
+        <div class="ctrl"> <input name="ledBlue" type="range" min="0" max="255" value="0" disabled><span
+                class="value"></span></div>
+
+    </div>
+    <div ><input id="fan" name="fan" type="checkbox" disabled><span>onboard fan</span></div>
+
+    <script src="sub2r.js"></script>
+    <script>
+        let device;
+        
+        document.getElementById('openCamera').addEventListener('click', onOpenCamera);
+        document.getElementById('reloadControls').addEventListener('click', reloadControls);
+
+        async function onOpenCamera() {
+            device = await openCamera();
+            await reloadControls();
+
+
+            // await device.claimInterface(0);
+        }
+
+        async function reloadControls() {
+            await setVersionInfo('fx3Version');
+            await setVersionInfo('fpgaVersion');
+
+            await setLedControl("Red");
+            await setLedControl("Green");
+            await setLedControl("Blue");
+            
+            await setFanControl();
+        }
+
+        
+
+        async function setVersionInfo(name) {
+            const val = await sendInReqeust(command[name]);
+            const el = document.getElementById(name);
+            el.innerHTML = val;
+        }
+
+        async function setLedControl(color) {
+            const val = await sendInReqeust(command["led" + color]);
+            const el = document.getElementById('ledControls').querySelector(`input[name=led${color}]`);
+            setLedOnInput(el, color);
+            el.value = val;
+            el.disabled = false;
+            el.parentElement.getElementsByClassName("value")[0].innerHTML = '' + el.value;
+            
+
+        }
+
+        async function setFanControl() {
+            const val = await sendInReqeust(command["fan"]);
+            const el = document.getElementById('fan');
+            setFanOnInput(el);
+            el.checked = val;
+            el.disabled = false
+
+        }
+
+        function setLedOnInput(el, color) {
+            el.oninput = async event => {
+                try {
+                    await sendOutReqeust(command["led"+color], el.value);
+                    el.parentElement.getElementsByClassName("value")[0].innerHTML = '' + el.value;
+                    
+                } catch (err) {
+                    console.error('oninput: ', err);
+                }
+            };
+        }
+
+        function setFanOnInput(el) {
+            el.oninput = async event => {
+                try {
+                    const cmd = command['fan'];
+                    const res = await sendInReqeust(cmd, {returnResult: true});
+                    let val = getUint8(res.data);
+                    if (el.checked) val |= cmd.bit; else val &= !cmd.bit;
+                    
+                    await sendOutReqeust(cmd, val);
+                    
+                } catch (err) {
+                    console.error('oninput: ', err);
+                }
+            };
+        }
+
+    </script>
+</body>
+
+</html>
+
+
+<!-- 
+
+    enum USBRequestType {
+  "standard",
+  "class",
+  "vendor"
+};
+
+enum USBRecipient {
+  "device",
+  "interface",
+  "endpoint",
+  "other"
+};
+
+dictionary USBControlTransferParameters {
+  required USBRequestType requestType;
+  required USBRecipient recipient;
+  required octet request;
+  required unsigned short value;
+  required unsigned short index;
+};
+ -->

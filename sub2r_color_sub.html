@@ -1,0 +1,962 @@
+<html>
+
+<head>
+    <script src="colorsys.js"></script>
+</head>
+
+<body>
+    <style>
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .app-top {
+            flex: 1 1 auto;
+            position:relative;
+        }
+
+        .app-bottom {
+            max-height: 350px;
+        }
+
+        #colorSub {
+            font-size: 0.8em;
+        }
+
+        #colorSub .left-panel {
+            margin-right: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: max-content max-content;
+        }
+
+        #colorSub .right-panel {
+            display: flex;
+            flex-direction: column;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: max-content;
+            grid-column-gap: 10px;
+        }
+
+        .border-ridge {
+            border: 2px solid #ddd;
+            border-style: ridge;
+        }
+
+        .left-panel .group {
+            margin-top: 10px;
+        }
+
+        .group-border .group-title {
+            margin-top: -10px;
+            margin-left: 10px;
+            padding-right: 5px;
+            padding-left: 5px;
+            background: #FFF;
+            width: fit-content;
+        }
+
+        .group-content input[type=number] {
+            width: 4em;
+            margin-left: 10px;
+        }
+
+        .group-content input[type=number]::-webkit-inner-spin-button {
+            opacity: 1;
+        }
+
+        .group-content {
+            display: flex;
+            margin-bottom: 20px;
+            margin-top: 10px;
+        }
+
+        .group-content .caption {
+            min-width: 7em;
+            text-align: right;
+            margin-right: 10px;
+
+        }
+
+        .group-content .hor-slider {
+            max-width: 250px;
+            min-width: 200px;
+        }
+
+        .group-content input[type=number] {
+            margin-right: 10px;
+        }
+
+        .chroma-content {
+            flex-grow: 1;
+            display: grid;
+            grid-template-columns: auto 1fr auto 1fr;
+            grid-template-rows: auto 1fr;
+            gap: 4px;
+            /* border: 1px solid red; */
+
+        }
+
+        .chroma-content>div {
+            /* border: 1px solid red; */
+        }
+
+
+        /* .chroma-content input {
+            width: 15px;
+        } */
+
+        .chroma-arrow {
+            margin-top: auto;
+            margin-bottom: auto;
+        }
+
+        .chroma-title {
+            text-align: center;
+
+        }
+
+        .grid-band {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px;
+            padding: 4px;
+
+        }
+
+        .grid-band .band {
+            margin: 1px;
+            border: 3px solid #ddd;
+            aspect-ratio: 1 / 1;
+            text-align: center;
+
+            display: flex;
+            flex-direction: column;
+
+            min-width: 75px;
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+        }
+
+        .grid-band .band.active {
+            border-color: #444;
+        }
+
+        .grid-band .band-color {
+            display: grid;
+            grid-template-columns: 15fr 55fr 30fr;
+            height: 100%;
+            border: 1px solid #ddd;
+        }
+
+        .grid-band .band-color>* {
+            background-size: contain;
+        }
+
+
+        #inverse-current-band {
+            margin-left: 20px;
+        }
+
+        .slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            border: solid 2px #d3d3d3;
+            border-radius: 3px;
+        }
+
+        .slider-vertical {
+            transform: rotate(90deg);
+            transform-origin: top left;
+            -webkit-appearance: none;
+            appearance: none;
+            width: 50%;
+            background: transparent;
+            border: solid 2px #d3d3d3;
+            height: 8px;
+            position: absolute;
+            top: 0;
+            left: 17;
+            padding: 0;
+            margin: 0;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 10px;
+            height: 20px;
+            margin-top: -5px;
+
+            border: 0;
+            background: url("data:image/svg+xml,<svg width='10' height='20'  viewBox='0 0 20 40' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M10,0 L20,10 20,40 0,40 0,10z' fill='blue'/></svg>");
+            cursor: pointer;
+        }
+
+
+        .thumb-right::-webkit-slider-thumb {
+            transform: rotate(45deg);
+        }
+
+        .thumb-bottom::-webkit-slider-thumb {
+            transform: rotate(180deg);
+            margin-top: 5px;
+        }
+
+        .slider-vert-outer-wrapper {
+            display: table;
+        }
+
+        .slider-vert-inner-wrapper {
+            padding: 50% 0;
+            width: 25px;
+            position: relative;
+        }
+
+        .hide {
+            display: none !important;
+        }
+    </style>
+    <svg width="0" height="0">
+        <defs id="svg-defs">
+            <linearGradient id="gradient-brightness" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#000" stop-opacity="0"></stop>
+                <stop offset="100%" stop-color="#000" stop-opacity="0">
+                </stop>
+            </linearGradient>
+            <linearGradient id="gradient-saturation-band0" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stop-color="#fff" stop-opacity="0"></stop>
+                <stop offset="100%" stop-color="#fff" stop-opacity="0">
+                </stop>
+            </linearGradient>
+
+            <linearGradient id="gradient-luma-band0" x1="0" x2="0" y1="0" y2="1">
+            </linearGradient>
+            <linearGradient id="Gradient1">
+                <stop offset="0%" stop-color="#0ff" />
+                <stop offset="8.4%" stop-color="#00f" />
+                <stop offset="16.7%" stop-color="#f0f" />
+                <stop offset="25%" stop-color="#f00" />
+                <stop offset="33.4%" stop-color="#ff0" />
+                <stop offset="41.7%" stop-color="#0f0" />
+                <stop offset="50%" stop-color="#0ff" />
+                <stop offset="58.4%" stop-color="#00f" />
+                <stop offset="66.7%" stop-color="#f0f" />
+                <stop offset="75%" stop-color="#f00" />
+                <stop offset="83.4%" stop-color="#ff0" />
+                <stop offset="91.7%" stop-color="#0f0" />
+                <stop offset="100%" stop-color="#0ff" />
+            </linearGradient>
+            <g id="svg-band-0">
+                <rect x="0" y="0" width="200%" height="100%" fill="url(#Gradient1)"></rect>
+                <rect x="0" y="0" width="100%" height="100%" fill="url(#gradient-brightness)"></rect>
+                <rect x="0" y="0" width="100%" height="100%" fill="url(#gradient-saturation-band0)"></rect>
+            </g>
+        </defs>
+    </svg>
+
+    <div class="app">
+        <div class="app-top">
+            
+            <video id="gum-local" style="height: 100%;position:absolute" autoplay="" playsinline=""></video>
+        </div>
+        <div class="app-bottom">
+            <input id="with-video" type="checkbox">with video <button id="openCamera">SUB2r USB3 HD Camera</button>
+            <button id="test-data">test data</button>
+            <button id="reloadControls" class="hide">reload controls</button>
+
+
+            <div id="colorSub-loading" class="hide">Loading...</div>
+            <div id="colorSub" class="hide" style="display:flex; flex-direction: column">
+                <div class="group">
+                    <span style="cursor: pointer;"><input id="enable-chroma-key" type="checkbox" />Enable chroma key
+                        enhancer</span>
+                    <button id="inverse-current-band">Build an inverse of the current band</button>
+                </div>
+                <div style="display:flex; flex-direction:row">
+                    <div class="left-panel">
+
+                        <div class="group-border group border-ridge">
+                            <div class="group-title">Hue</div>
+                            <div class="group-content" style="margin-top: 20px">
+                                <div class="caption">Value:</div>
+                                <div style="width: 100%; position: relative;">
+                                    <img id="hue-value-background" height="10"
+                                        style="position: absolute;top: -22px;width: calc(100% - 15px);margin-left: 7;margin-right: 7.5px">
+                                    <input id="hue-value-slider" type="range" class="slider hor-slider"
+                                        style="margin-left:0" min="0" max="359" value="0" data-value-name="hue" />
+                                </div>
+
+                                <input id="hue-value-edit" type="number" min="0" max="359" value="0"
+                                    data-value-name="hue" />
+
+
+                            </div>
+                            <div class="group-content">
+                                <div class="caption">Tolerance:</div>
+                                <input id="hue-tolerance-slider" type="range" class="slider hor-slider thumb-bottom"
+                                    min="0" max="179" value="0" data-value-name="tolerance" />
+                                <input id="hue-tolerance-edit" type="number" min="0" max="179" value="0"
+                                    data-value-name="tolerance" />
+
+
+                            </div>
+                        </div>
+                        <div class="group-border  group border-ridge">
+                            <div class="group-title">Saturation</div>
+                            <div class="group-content">
+                                <div class="caption">Lower bound:</div>
+                                <input id="saturation-lower-bound-slider" type="range"
+                                    class="slider hor-slider thumb-bottom" min="0" max="255" value="0"
+                                    data-value-name="saturationMin" />
+                                <input id="saturation-lower-bound-edit" type="number" min="0" max="255" value="0"
+                                    data-value-name="saturationMin" />
+                            </div>
+                            <div class="group-content">
+                                <div class="caption">Upper bound:</div>
+                                <input id="saturation-upper-bound-slider" type="range"
+                                    class="slider hor-slider thumb-bottom" min="0" max="255" value="0"
+                                    data-value-name="saturationMax" />
+                                <input id="saturation-upper-bound-edit" type="number" min="0" max="255" value="0"
+                                    data-value-name="saturationMax" />
+
+
+                            </div>
+                        </div>
+                        <div class="group-border  group border-ridge">
+                            <div class="group-title">Luminance (shadows/highlights)</div>
+                            <div class="group-content">
+                                <div class="caption">Dark clip:</div>
+                                <input id="luminance-dark-clip-slider" type="range"
+                                    class="slider hor-slider thumb-bottom" min="0" max="255" value="0"
+                                    data-value-name="lumaMin" />
+                                <input id="luminance-dark-clip-edit" type="number" min="0" max="255" value="0"
+                                    data-value-name="lumaMin" />
+
+
+                            </div>
+                            <div class="group-content">
+                                <div class="caption">Bright clip:</div>
+                                <input id="luminance-bright-clip-slider" type="range"
+                                    class="slider hor-slider thumb-bottom" min="0" max="255" value="0"
+                                    data-value-name="lumaMax" />
+                                <input id="luminance-bright-clip-edit" type="number" min="0" max="255" value="0"
+                                    data-value-name="lumaMax" />
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <div class="right-panel">
+
+                        <div class="group-content chroma-content group">
+                            <div class="chroma-title"></div>
+                            <div class="chroma-title">
+                                <div>Chroma</div>
+                                <div>key</div>
+                            </div>
+                            <div class="chroma-title"></div>
+                            <div class="chroma-title">
+                                <div>Unified</div>
+                                <div> color</div>
+                            </div>
+
+                            <div class="slider-vert-container">
+                                <div class="slider-vert-outer-wrapper">
+                                    <div class="slider-vert-inner-wrapper">
+                                        <input id="brightness-slider" type="range" class="slider-vertical" value="0"
+                                            min="0" max="255" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="chroma-key border-ridge" style="position: relative;--width: calc(100%);">
+                                <!-- <img id="chroma-key-background" style="position:absolute;height:100%;width: var(--width)"> -->
+                                <!-- <div id="saturation-background" style="position:absolute;height:100%;width: var(--width)"></div> -->
+                                <!-- <img id="chroma-key-background" style="position:absolute;height:100%;width: 200px"> -->
+                                <!-- <div id="saturation-background" style="position:absolute;height:100%;width: 200px"></div>? -->
+                                <svg style="position: absolute;height: 100%;width: var(--width);height: 100%;">
+                                    <use id="use-svg-band" xlink:href="#svg-band-0" />
+                                </svg>
+                            </div>
+                            <div class="chroma-arrow"><svg width="35" height="30">
+                                    <path d="M0,10 L20,10 20,0 35,15 20,30 20,20 0,20" fill="transparent"
+                                        stroke="black" />
+                                </svg></div>
+                            <div id="unified-color" class="border-ridge">
+                                <input type="color" style="width:0;height: 0;opacity:0">
+                            </div>
+                        </div>
+
+                        <div class="group-border group group-brand border-ridge">
+                            <div class="group-title">Select one of the 4 bands</div>
+                            <div class="grid-band">
+                                <div style="position: relative;">
+                                    <div id="band-0" class="band">
+                                        <div class="band-caption">Band #1</div>
+                                        <div class="band-color">
+                                            <div class="band-line">
+                                                <div style="position: relative;--width: calc(100%);height: 100%;">
+                                                    <svg
+                                                        style="position: absolute;height: 100%;width: var(--width);height: 100%;left:0">
+                                                        <rect x="0" y="0" width="100%" height="100%"
+                                                            fill="url(#gradient-luma-band0)">
+                                                        </rect>
+                                                        <rect id="band-luma-min-line-0" x="0" y="0" width="100%"
+                                                            height="2" fill="black" stroke="black"></rect>
+                                                        <rect id="band-luma-max-line-0" x="0" y="0" width="100%"
+                                                            height="2" fill="black" stroke="black"></rect>
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                            <div class="band-chroma">
+                                                <div style="position: relative;--width: calc(100%);height: 100%;">
+                                                    <svg
+                                                        style="position: absolute;height: 100%;width: var(--width);height: 100%;left:0">
+                                                        <use id="link-svg-band" xlink:href="#svg-band-0"></use>
+                                                    </svg>
+                                                </div>
+                                            </div>
+                                            <div id="unified-color-0"></div>
+                                        </div>
+                                    </div>
+                                    <div id="chroma-key-control-overlay-0"
+                                        style="position: absolute;top: 0;left: 0;width: 100%;height: 100%;background-color:  rgba(150,150,150,0.5);pointer-events: none;">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- <div style="position: absolute;top: 200px;left: 800px;">
+        <div class="grid-band" style="width:400px">
+            <div style="position: relative;">
+                <div class="band" style="width: 100%;height: 100%;box-sizing: border-box;">
+                    <div>Band #1</div>
+                    <div class="band-color">
+                        <div class="band-line">
+                            <div style="position: relative;--width: calc(100%);height: 100%;">
+                                <svg style="position: absolute;height: 100%;width: var(--width);height: 100%;left:0">
+                                    <rect x="0" y="0" width="100%" height="100%" fill="url(#gradient-lum)"></rect>
+                                    <rect id="band-luma-min-line-0" x="0" y="0" width="100%" height="2" fill="black"
+                                        stroke="black"></rect>
+                                    <rect id="band-luma-max-line-0" x="0" y="0" width="100%" height="2" fill="black"
+                                        stroke="black"></rect>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="band-chroma">
+                            <div style="position: relative;--width: calc(100%);height: 100%;">
+                                <svg style="position: absolute;height: 100%;width: var(--width);height: 100%;left:0">
+                                    <use id="link-svg-band" xlink:href="#svg-band-0"></use>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="band-cur-color"></div>
+                    </div>
+                </div>
+                <div style="position: absolute;top: 0;left: 0;width: 100%;height: 100%;background-color:  rgba(0,0,0,.5);"></div>
+            </div>
+        </div>
+    </div> -->
+
+    <script src="sub2r.js"></script>
+    <script>
+        let device;
+        let activeBand = 0;
+        let container = document.getElementById('colorSub');
+        let slider = {};
+        let inputEdits = {};
+        let colorSubstitution = {};
+        let isTestData = false;
+        const openCamera = sub2r.openCamera;
+
+        document.getElementById('test-data').addEventListener('click', () => { isTestData = true; onOpenCamera(); });
+        document.getElementById('openCamera').addEventListener('click', () => { isTestData = false; onOpenCamera(); });
+        document.getElementById('reloadControls').addEventListener('click', reloadControls);
+
+
+        function addClass(id, className) {
+            document.getElementById(id).classList.add(className);
+        }
+        function removeClass(id, className) {
+            document.getElementById(id).classList.remove(className);
+        }
+
+        async function onOpenCamera() {
+            removeClass('colorSub-loading', 'hide');
+            let isError = false;
+            try {
+                if (!isTestData) {
+                    device = await openCamera();
+
+
+                    if (document.querySelector('#with-video').checked) {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: true });
+                        const video = document.querySelector('video');
+                        const videoTracks = stream.getVideoTracks();
+                        console.log(`Using video device: ${videoTracks[0].label}`);
+                        video.srcObject = stream;
+                    }
+
+                }
+
+
+                await reloadControls();
+            } catch (e) {
+                console.error(e);
+                isError = true;
+            }
+
+            if (!isError || isTestData) {
+                addClass('colorSub-loading', 'hide');
+                removeClass('colorSub', 'hide');
+                removeClass('reloadControls', 'hide');
+                setVertSlider();
+            }
+
+        }
+
+        async function reloadControls() {
+            if (!isTestData) {
+                colorSubstitution = await sub2r.recieveColorSubstitution();
+            } else {
+                colorSubstitution = [];
+                removeClass('colorSub', 'hide');
+                for (let i = 0; i < 4; i++) {
+                    colorSubstitution.push({
+                        enabled: i % 2 == 0,
+                        saturationMin: i * 10 + 100,
+                        saturationMax: i * 10 + 100,
+                        lumaMin: i * 10 + 100,
+                        lumaMax: i * 10 + 100,
+                        hue: i * 10 + 100,
+                        tolerance: i * 10 + 100,
+                        colorRed: i === 0 ? 255 : 0,
+                        colorGreen: i === 1 ? 255 : i === 3 ? 128 : 0,
+                        colorBlue: i === 2 ? 255 : i === 3 ? 128 : 0,
+
+                    });
+                }
+            }
+            removeAllListeners();
+            initBrightness();
+            initVars();
+
+            assignContolValue();
+            initBands();
+            bindRangeWithEdit();
+            initRedrawBackgrounds();
+            initColorPicker();
+            initEnableChromaKey();
+            drawAll();
+
+        }
+
+        function removeAllListeners() {
+            const clone = container.cloneNode(true);
+            container.parentNode.replaceChild(clone, container);
+        }
+
+        function initVars() {
+            container = document.getElementById('colorSub');
+            sliders = {};
+            inputEdits = {};
+            container.querySelectorAll('input').forEach((el) => {
+                const valueName = el.attributes['data-value-name']?.value;
+                if (valueName) {
+                    if (el.type === 'range') {
+                        sliders[valueName] = el;
+                    } else {
+                        inputEdits[valueName] = el;
+                    }
+                }
+            })
+        }
+
+        function initBrightness() {
+            const b = document.getElementById('brightness-slider');
+            b.value = 0;
+        }
+
+
+        function setVertSlider() {
+            const vertWrapper = container.getElementsByClassName('slider-vert-container')[0];
+            const vertInput = vertWrapper.querySelector('input');
+            vertInput.style.width = vertWrapper.offsetHeight;
+        }
+
+
+
+        function assignContolValue() {
+            const colorSub = colorSubstitution[activeBand];
+
+            for (let name in sliders) {
+                sliders[name].value = colorSub[name];
+                if (inputEdits[name]) inputEdits[name].value = colorSub[name];
+            }
+
+            const cl = colorsys.rgbToHexString(colorSub.colorRed, colorSub.colorGreen, colorSub.colorBlue);
+            document.querySelector('#unified-color').style.backgroundColor = cl;
+            document.querySelector('#unified-color input').value = cl;
+
+            console.log(activeBand, colorSub)
+            document.querySelector("#enable-chroma-key").checked = !!colorSub.enabled;
+
+        }
+
+        function bindRangeWithEdit() {
+            container.querySelectorAll('input[type=range]').forEach((el) => {
+                if (el.id) {
+                    const n = el.id.split('-');
+                    n[n.length - 1] = 'edit';
+                    const editId = n.join('-');
+                    const editEl = document.getElementById(editId);
+                    if (editEl) {
+                        const onInputChange = (e) => {
+                            el.value = e.target.value;
+                            editEl.value = e.target.value;
+                        }
+                        el.addEventListener('input', onInputChange);
+                        editEl.addEventListener('input', onInputChange);
+                    }
+                }
+            })
+        }
+
+        function creatingHueImage(hueValue, hueTolerance) {
+            const drawImage = new colorsys.DrawImage(360, 1);
+
+            const hMin = (hueValue - hueTolerance + 359) % 360;
+            const hMax = (hueValue + hueTolerance) % 360;
+
+
+            for (let hue = 0; hue < 360; ++hue) {
+                let v = 255;
+                if (hMin < hMax && (hue < hMin || hue > hMax)) v = 128
+                if (hMin >= hMax && (hue < hMin && hue > hMax)) v = 128
+                drawImage.addNextPointHsv(hue, 255, v);
+            }
+            return drawImage.getUrl();
+        }
+
+
+
+        function creatingChromaKeyImage(hueValue, hueTolerance, luma) {
+            const drawImage = new colorsys.DrawImage(360, 1);
+
+            for (let x = 0; x < 360; ++x) {
+                const hue = hueValue - hueTolerance + (2 * hueTolerance + 1) * x / 360;
+                drawImage.addNextPointHsv(hue, 255, luma);
+            }
+            return drawImage.getUrl();
+        }
+
+
+        function oneColorToString(b) {
+            let n = b.toString(16);
+            if (n.length === 1) n = '0' + n;
+            return '#' + n + n + n;
+        }
+        function redrawImages(band, vals, changes) {
+            band = band === -1 ? activeBand : band;
+            const isHueChange = !(changes) || changes.includes('hue') || changes.includes('tolerance');
+            const isSaturationChange = !(changes) || changes.includes('saturationMin') || changes.includes('saturationMax');
+            const isLumaChange = !(changes) || changes.includes('lumaMin') || changes.includes('lumaMax');
+            const isColorChange = !(changes) || changes.includes('colorRed') || changes.includes('colorGreen') || changes.includes('colorBlue');
+
+            const b = document.getElementById('brightness-slider');
+            const brightness = b.value || 0;
+            const oldBrightness = b.attributes['data-old-value']?.value;
+            const isBrightnesChange = !(changes) || brightness !== oldBrightness;
+            if (isBrightnesChange) {
+                b.setAttribute('data-old-value', brightness);
+            }
+
+
+
+            if (isHueChange) {
+                const imgHue = document.getElementById('hue-value-background');
+                const url = creatingHueImage(vals.hue, vals.tolerance);
+                imgHue.src = url;
+            }
+
+            if (isHueChange || isBrightnesChange) {
+                // const imgChroma = document.getElementById('chroma-key-background');
+                // const url = creatingChromaKeyImage(vals.hue, vals.tolerance, 255 - brightness);
+                // imgChroma.src = url;
+                // const bandCroma = document.getElementById("band-" + activeBand).getElementsByClassName('band-chroma')[0];
+                // bandCroma.style.backgroundImage = `url(${url})`;
+
+                const rect = document.querySelector(`#svg-band-${band} rect`)
+                const scaleX = 180 / (vals.tolerance || 1);
+                const x = -(vals.hue / 3.6) - (50 - 50 * vals.tolerance / 180);
+                rect.setAttribute('x', `${x.toFixed(2)}%`);
+                rect.style.transform = `scaleX(${scaleX.toFixed(2)})`;
+
+
+            }
+            if (isBrightnesChange) {
+                const stops = document.querySelectorAll('#gradient-brightness stop');
+                stops[0].setAttribute('stop-opacity', (brightness / 255).toFixed(2));
+                stops[1].setAttribute('stop-opacity', (brightness / 255).toFixed(2));
+            }
+            if (isSaturationChange) {
+                const stops = document.querySelectorAll(`#gradient-saturation-band${band} stop`);
+                stops[0].setAttribute('stop-opacity', ((255 - vals.saturationMin) / 255).toFixed(2));
+                stops[1].setAttribute('stop-opacity', ((255 - vals.saturationMax) / 255).toFixed(2));
+            }
+
+            if (isLumaChange) {
+                const gr = document.querySelector("#gradient-luma-band" + band);
+                gr.innerHTML = '';
+
+                const mn = Math.round((255 - vals.lumaMin) / 2.55);
+                const mx = Math.round((255 - vals.lumaMax) / 2.55);
+                if (vals.lumaMax > vals.lumaMin) {
+                    gr.insertAdjacentHTML('beforeEnd', `<stop offset="0%" stop-color="#fff" stop-opacity="1">`);
+                    gr.insertAdjacentHTML('beforeEnd', `<stop offset="${mx}%" stop-color="#fff" stop-opacity="1">`);
+                    gr.insertAdjacentHTML('beforeEnd', `<stop offset="${mx}%" stop-color="rgb(${mx},${mx},${mx})" stop-opacity="${mx / 100}">`);
+                    gr.insertAdjacentHTML('beforeEnd', `<stop offset="${mn}%" stop-color="rgb(${mn},${mn},${mn})" stop-opacity="${mn / 100}">`);
+                    gr.insertAdjacentHTML('beforeEnd', `<stop offset="${mn}%" stop-color="#fff" stop-opacity="1">`);
+                    gr.insertAdjacentHTML('beforeEnd', `<stop offset="100%" stop-color="#fff" stop-opacity="1">`);
+
+                }
+                document.querySelector("#band-luma-min-line-" + band).setAttribute('y', `${mn}%`);
+                document.querySelector("#band-luma-max-line-" + band).setAttribute('y', `${mx}%`)
+            }
+
+            if (isColorChange) {
+                const cl = `rgb(${vals.colorRed},${vals.colorGreen},${vals.colorBlue})`;
+                document.querySelector('#unified-color-' + activeBand).style.backgroundColor = cl;
+            }
+
+
+            // if (isSaturationChange) {
+            //     const imgSaturation = document.getElementById('saturation-background');
+            //     const b = `linear-gradient(to bottom, rgb(255 255 255 / ${1 - vals.saturationMax / 255}), rgb(255 255 255 / ${1 - vals.saturationMin / 255}))`;
+            //     imgSaturation.style.backgroundImage = b
+            // }
+        }
+
+        function updateAndRedraw() {
+            const vals = colorSubstitution[activeBand];
+            const changes = [];
+            const newVals = {};
+            for (let name in sliders) {
+                newVals[name] = Math.round(sliders[name].value);
+            }
+
+            const picker = document.querySelector("#unified-color input[type=color]");
+            const c = colorsys.stringToRgb(picker.value);
+            newVals.colorRed = c.r;
+            newVals.colorGreen = c.g;
+            newVals.colorBlue = c.b;
+
+            for (let name in newVals) {
+                if (vals[name] != newVals[name]) {
+                    changes.push(name);
+                    vals[name] = newVals[name];
+                }
+            }
+
+            if (!isTestData) {
+                changes.forEach(name => {
+                    sub2r.sendBandValue(activeBand, name, vals[name]);
+                })
+            }
+
+            redrawImages(activeBand, vals, changes);
+        }
+
+        function drawAll() {
+            for (let band = 3; band >= 0; band--) {
+                activeBand = band;
+                redrawImages(band, colorSubstitution[band]);
+                enableChromaKeyDraw(band, colorSubstitution[band].enabled);
+            }
+        }
+        function initRedrawBackgrounds() {
+            document.querySelectorAll('#colorSub input').forEach(el => {
+                el.addEventListener('input', updateAndRedraw);
+            })
+        }
+
+
+        function replaceBandNum(node, band) {
+            if (node.attributes) {
+                for (let i = 0; i < node.attributes.length; i++) {
+                    const attr = node.attributes[i];
+                    if (attr.value.endsWith('-0')) {
+                        node.setAttribute(attr.name, attr.value.slice(0, -1) + band)
+                    } else if (attr.value.includes('-band0')) {
+                        node.setAttribute(attr.name, attr.value.replace('-band0', '-band' + band))
+                    }
+                }
+            }
+            node.childNodes.forEach(n => {
+                replaceBandNum(n, band);
+            })
+        }
+
+
+        function cloneBandsFromBand0() {
+            if (document.querySelector("#band-1")) return;
+            const band0 = document.querySelector(".grid-band div");
+
+            for (let i = 1; i < 4; i++) {
+                const clone = band0.cloneNode(true);
+                replaceBandNum(clone, i);
+                clone.querySelector('.band-caption').innerHTML = "Band #" + (i + 1);
+                band0.parentElement.appendChild(clone);
+            }
+
+            const defs = document.querySelector('#svg-defs');
+            for (let i = 1; i < 4; i++) {
+                defs.childNodes.forEach(n => {
+                    if (n.id && (n.id.endsWith('-0') || n.id.endsWith('-band0'))) {
+                        const clone = n.cloneNode(true);
+                        replaceBandNum(clone, i);
+                        defs.appendChild(clone);
+                    }
+                });
+            }
+
+        }
+        function initBands() {
+            cloneBandsFromBand0();
+
+
+            const bands = Array.from(container.getElementsByClassName("band"));
+
+            bands[0].classList.add('active');
+            bands[1].classList.remove('active');
+            bands[2].classList.remove('active');
+            bands[3].classList.remove('active');
+
+            const onclick = (event) => {
+                const id = event.currentTarget.id;
+                const newActive = Number.parseInt(id.substr(-1));
+                if (newActive !== activeBand) {
+                    bands[activeBand].classList.remove('active');
+                    bands[newActive].classList.add('active');
+                    activeBand = newActive;
+                    assignContolValue();
+                    redrawImages(activeBand, colorSubstitution[activeBand]);
+                    document.querySelector('#use-svg-band').setAttribute("xlink:href", "#svg-band-" + activeBand);
+                }
+            }
+
+            bands.forEach(el => {
+
+                el.addEventListener('click', onclick);
+            })
+        }
+
+
+        function initColorPicker() {
+            const picker = document.querySelector("#unified-color input[type=color]");
+            const el = document.querySelector("#unified-color");
+            function colorChange() {
+                el.style.backgroundColor = picker.value;
+            }
+
+            el.addEventListener('click', () => picker.click());
+            picker.addEventListener('input', colorChange)
+        }
+
+
+
+        function enableChromaKeyDraw(band, enabled) {
+            console.log(band, enabled)
+
+            if (enabled) {
+                addClass("chroma-key-control-overlay-" + band, 'hide')
+            } else {
+                removeClass("chroma-key-control-overlay-" + band, 'hide')
+            }
+        }
+
+        function initEnableChromaKey() {
+            const el = document.querySelector("#enable-chroma-key");
+
+            function onChange() {
+                const curValue = colorSubstitution[band].enabled;
+                const newValue = el.checked ? 1 : 0;
+                if (curValue !== newValue && !isTestData) {
+                    sub2r.sendBandValue(band, 'enabled', newValue);
+                }
+                colorSubstitution[activeBand].enabled = newValue;
+                enableChromaKeyDraw(activeBand, el.checked);
+            }
+            el.addEventListener('change', onChange);
+            el.parentElement.addEventListener('click', (e) => {
+                if (event.target !== el) {
+                    el.checked = !el.checked;
+                    onChange();
+                }
+            });
+
+        }
+
+        function inverseCurrentBand() {
+            const userVals = { ...colorSubstitution[activeBand] };
+            colorSubstitution = [];
+            for (let i = 0; i < 4; i++) {
+                colorSubstitution.push({
+                    enabled: true,
+                    saturationMin: 0,
+                    saturationMax: 255,
+                    lumaMin: 0,
+                    lumaMax: 255,
+                    hue: 0,
+                    tolerance: 0,
+                    colorRed: userVals.colorRed,
+                    colorGreen: userVals.colorGreen,
+                    colorBlue: userVals.colorBlue,
+                })
+            }
+            // inverse hue, full saturation/brightness coverage
+            colorSubstitution[0].hue = (userVals.hue + 180) % 360;
+            colorSubstitution[0].tolerance = Math.max(179, Math.min(1, 180 - userVals.tolerance));
+            if (userVals.saturationMax < 20) colorSubstitution[0].tolerance = 179;  // don't give a damn about the hue since saturation is so low
+            colorSubstitution[2] = userVals; // move to band #3 for reference
+            colorSubstitution[2].enabled = false; // and disable it, of course
+
+            // full hue, edges of saturation and brightness
+            colorSubstitution[1].hue = colorSubstitution[0].hue;
+            colorSubstitution[3].hue = colorSubstitution[0].hue // inverse hue value
+            colorSubstitution[1].tolerance = 179;
+            colorSubstitution[3].tolerance = 179;    // max hue tolerance
+
+            if (Math.min(userVals.saturationMin, 255 - user.saturationMax) > Math.Min(userVals.lumaMin, 255 - user.lumaMax)) {
+                // limited saturaion, full brightness coverage
+                colorSubstitution[1].saturationMax = userVals.saturationMin; // |-|-----
+                colorSubstitution[3].saturationMin = userVals.saturationMax; // -----|-|
+            } else {
+                // full saturation, limited brightness coverage
+                colorSubstitution[1].lumaMax = userVals.lumaMin;   // |-|-----
+                colorSubstitution[3].lumaMin = userVals.lumaMax;   // -----|-|
+            }
+
+            // configure camera with the new set of bands
+            activeBand = 0;
+            // for(auto& band: m_subs){
+            //     _uploadBand(band);
+            //     ++m_currIdx;
+            // }
+
+        }
+    </script>
+</body>
+
+</html>
