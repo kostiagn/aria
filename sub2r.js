@@ -3,6 +3,7 @@ const sub2r = {
 };
 window.sub2r = sub2r;
 (function () {
+    let device;
     const formatVersion = (data) => {
         const b = new Uint8Array(data.buffer);
         return `${b[0]}.${b[1]}.${b[2]}.${b[3]}`
@@ -25,12 +26,14 @@ window.sub2r = sub2r;
 
     sub2r.openCamera = async () => {
         //VID_04B4&PID_0036
-        const device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x04B4, productId: 0x0036 }] });
-
+        if (device) return device;
+        device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x04B4, productId: 0x0036 }] });
+        window.device = device;
         console.log(device);
         await device.open();
 
         await device.selectConfiguration(1);
+        sub2r.device = device;
         return device;
     }
 
@@ -97,19 +100,19 @@ window.sub2r = sub2r;
     async function controlTransferIn(packet, len) {
         debug(`send packet ${toHex(packet.request, 2)} ${toHex(packet.index, 2)}`, packet, "len", len);
         const res = await device.controlTransferIn(packet, len);
-        debug("receive data", res);
+        debug("receive data", res, len && res.status === 'ok' ? toHex(res.data.getUint8()) : '');
         return res;
     }
 
-    async function controlTransferOut(packet) {
+    async function controlTransferOut(packet, buff) {
         debug(`send packetOut ${toHex(packet.request, 2)} ${toHex(packet.index, 2)} ${toHex(packet.value, 2)} `, packet);
-        const res = await device.controlTransferOut(packet);
+        const res = await device.controlTransferOut(packet, buff);
         debug("receive data", res);
         return res;
     }
 
 
-    function getBandPacket({band, name, idxName, value}) {
+    function getBandPacket({ band, name, idxName, value }) {
         const cmd = bandCommand[name];
         if (!cmd) throw (`'name' is not band command`);
         const idx = cmd[idxName || 'idx'];
@@ -166,18 +169,18 @@ window.sub2r = sub2r;
         debug(`receive ${name} for band ${band}`);
         const cmd = bandCommand[name];
         if (!cmd) throw (`'name' is not band command`);
-        const packet = getBandPacket({band, name});
+        const packet = getBandPacket({ band, name });
         const res = await controlTransferIn(packet, 1);
         let val = res.data.getUint8();
         debug(`receiveBandValue: band ${band}, name ${name}, value ${val} (${toHex(val, 2)})`);
         if (cmd.idx2) {
-            const packet2 = getBandPacket({band, name, idxName: 'idx2'});
+            const packet2 = getBandPacket({ band, name, idxName: 'idx2' });
             const res2 = await controlTransferIn(packet2, 1);
             const val2 = res2.data.getUint8();
             val += 256 * val2;
             debug(`receiveBandValue: band ${band}, name ${name}, value ${val2} (${toHex(val2, 2)}) / ${val} (${toHex(val, 4)})`);
         }
-        
+
         if (cmd.convertIn) {
             val = cmd.convertIn(val);
             debug(`receiveBandValue: convert value band ${band}, name ${name}, value (${val})`);
@@ -195,7 +198,6 @@ window.sub2r = sub2r;
             for (let name of Object.keys(bandCommand)) {
                 obj[name] = await receiveBandValue(band, name);
             }
-            console.log('band ', band, "obj", obj)
             res.push(obj);
         }
         debug("recieveColorSubstitution result", res);
@@ -208,7 +210,7 @@ window.sub2r = sub2r;
         const cmd = bandCommand[name];
         if (!cmd) throw (`'name' is not band value`);
         if (!cmd.idx2) {
-            const packet = getBandPacket({band, name, value});
+            const packet = getBandPacket({ band, name, value });
             const res = await controlTransferOut(packet);
             debug(`sendBandValue: res ${res}`);
         } else {
@@ -217,12 +219,188 @@ window.sub2r = sub2r;
             }
             const val2 = value >> 8;
             const val1 = value & 0xFF;
-            const packet = getBandPacket({band, name, value: val1});
+            const packet = getBandPacket({ band, name, value: val1 });
             const res = await controlTransferOut(packet);
             debug(`sendBandValue: packet 1 res ${res}`);
-            const packet2 = getBandPacket({band, name, value: val2, idxName: 'idx2'});
+            const packet2 = getBandPacket({ band, name, value: val2, idxName: 'idx2' });
             const res2 = await controlTransferOut(packet2);
             debug(`sendBandValue: packet 2 res ${res}`);
         }
     }
+
+
+    function convertInHueVHue(v) {
+        return v / 0x4000 * 360;
+    }
+
+    function convertOutHueVHue(v) {
+        v = v < -180 ? -180 : v > 180 ? 180 : v;
+        return Math.round(v * 0x4000 / 360);
+    }
+    function convertInHueVSat(v) {
+        return v / 256;
+    }
+
+    function convertOutHueVSat(v) {
+        return Math.floor(v * 256);
+    }
+
+    const convertColorGradingIn = (v, fun) => {
+        const arr = Array.from(new Int16Array(v.buffer));
+        debug(`convertColorGradingIn: fun '${fun.name}' recieve array [${arr}]`);
+        const res = arr.map(fun);
+        debug(`convertColorGradingIn: fun '${fun.name}' converted array: [${res}]`);
+        return res;
+    }
+
+    const convertColorGradingOut = (v, fun) => {
+        const arr = new Int16Array(64);
+        for (let i = 0; i < 64; i++) {
+            arr[i] = fun(v[i]);
+        }
+        return arr;
+    }
+
+    sub2r.colorGrading = {
+        hueVhue: { table: 0, convertIn: convertInHueVHue, convertOut: convertOutHueVHue },
+        hueVsat: { table: 1, convertIn: convertInHueVSat, convertOut: convertOutHueVSat },
+        lumaVsat: 2,
+        satVsat: 3,
+        lumaVluma: 4,
+        hueVluma: 5,
+    }
+    sub2r.bulkReadColorGrading = async (cmd) => {
+        cmd = typeof cmd === 'string' ? sub2r.colorGrading[cmd] : cmd;
+        const packet = {
+            requestType: 'vendor',
+            recipient: 'device',
+            request: 0xB1,
+            value: 0x140, //version 1, count 0x40 = 64
+            index: cmd.table << 8,
+        }
+        const res = await controlTransferIn(packet, 128);
+
+        if (res.status !== 'ok') throw 'an error occurred while running bulkReadColorGrading. table = ' + cmd.table;
+        if (!cmd.convertIn) throw 'there is no convertIn function. table = ' + cmd.table;
+        return convertColorGradingIn(res.data, cmd.convertIn);
+    }
+
+    sub2r.bulkWriteColorGrading = async (cmd, arr) => {
+        cmd = typeof cmd === 'string' ? sub2r.colorGrading[cmd] : cmd;
+        const packet = {
+            requestType: 'vendor',
+            recipient: 'device',
+            request: 0xB1,
+            value: 0x140, //version 1, count 0x40 = 64
+            index: cmd.table << 8,
+        }
+        if (!cmd.convertOut) throw 'there is no convertOut function. table = ' + cmd.table;
+
+        const data = convertColorGradingOut(arr, cmd.convertOut);
+
+        let res = await controlTransferOut(packet, data);
+        if (res.status !== 'ok') throw 'an error occurred while running bulkReadColorGrading. table = ' + cmd.table;
+    }
+
+
+
+
+
+    function convertInBinning(v) {
+        switch (v & 0xFF) {
+            case 0x00: return 0;
+            case 0x01: return 1;
+            case 0x10: return 2;
+            case 0x11: return 3;
+        }
+    }
+    function convertOutBinning(v) {
+        switch (v) {
+            case 0: return 0x1100;
+            case 1: return 0x1101;
+            case 2: return 0x1110;
+            case 3: return 0x1111;
+        }
+    }
+    function convertSensorIn(v1, v2) {
+        return ((v1 & 0xFF) << 8) + (v2 & 0xFF);
+    }
+    function convertSensorOut(v) {
+        return {
+            v1: 0xFF + (v >> 8),
+            v2: 0xFF + (v & 0xFF)
+        }
+    }
+
+    const sensorsCommand = {
+        binning: { idx: 0x3663, convertIn: convertInBinning, convertOut: convertOutBinning },
+        rgbEnabled: { idx: 0x5001, convertIn: (v) => (v & 0x02) > 0, convertOut: (v) => v ? 0x02ff : 0x0200, },
+        red: { idx: 0x5056, len: 2 },
+        green: { idx: 0x5058, len: 2 },
+        blue: { idx: 0x505A, len: 2 },
+        gain: { idx: 0x350A, len: 2 },
+        exposure: { idx: 0x3500, len: 3 },
+        black: { idx: 0x4004, len: 2 },
+    }
+
+    sub2r.bulkReadSensors = async () => {
+        const packet = {
+            requestType: 'vendor',
+            recipient: 'device',
+            request: 0xA5,
+            value: 0,
+            index: 0,
+        }
+
+        const res = {};
+        for (let name in sensorsCommand) {
+            const cmd = sensorsCommand[name];
+            debug(`bulkReadSensors: read value ${name}`);
+            if (cmd.len && cmd.len > 0) {
+                let v = 0;
+                for (let i = 0; i < cmd.len; i++) {
+                    packet.index = cmd.idx + i;
+                    let ans = await controlTransferIn(packet, 2);
+                    if (ans.status !== 'ok') throw 'an error occurred while running bulkReadSensors. value = ' + name + " idx = " + packet.index;
+                    v = (v << 8) + ans.data.getUint8();
+                }
+                res[name] = v;
+            } else {
+                packet.index = cmd.idx;
+                let ans = await controlTransferIn(packet, 2);
+                if (ans.status !== 'ok') throw 'an error occurred while running bulkReadSensors. value = ' + name;
+                let v = ans.data.getUint8();
+                if (cmd.convertIn) v = cmd.convertIn(v);
+                res[name] = v;
+            }
+        }
+
+        debug('bulkReadSensors: recieve values ', res)
+        return res;
+    }
+
+    sub2r.writeSensor = async (name, value) => {
+        const packet = {
+            requestType: 'vendor',
+            recipient: 'device',
+            request: 0xA5,
+            value: 0,
+            index: 0,
+        }
+
+        if (!sensorsCommand[name]) throw `writeSensor: not found command for '${name}'`
+
+        const cmd = sensorsCommand[name];
+        debug(`writeSensor: write value for ${name}`, value);
+        const ln = cmd.len || 1;
+        for (let i = 0; i < ln; i++) {
+            packet.index = cmd.idx + i;
+            let v = typeof value === 'number' ? 0xFF & (value >> (8 * (cmd.len - i - 1))) : value;
+            packet.value = cmd.convertOut ? cmd.convertOut(v) : 0xFF00 + v;
+            let ans = await controlTransferOut(packet);
+            if (ans.status !== 'ok') throw 'an error occurred while running writeSensor. name = ' + name + " idx = " + packet.index;
+        }
+    }
+
+
 })();

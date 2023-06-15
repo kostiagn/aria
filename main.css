@@ -7,7 +7,22 @@
  stroke-width: 1;
   cursor: pointer;
 }
+.point.active {
+    fill: red;
+    stroke-width: 2;
+}
 .point:hover {
+    fill: red;
+    stroke-width: 2;
+}
+
+.missed-slider {
+    fill: white;
+    stroke: #E8C48E;
+    stroke-width: 1;
+    cursor: pointer;
+}
+.missed-slider:hover {
     fill: red;
     stroke-width: 2;
 }
@@ -72,7 +87,7 @@
     flex: 1 1 auto;
     
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
 }
 #curves {
     

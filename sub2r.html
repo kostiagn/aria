@@ -27,22 +27,25 @@
         document.getElementById('reloadControls').addEventListener('click', reloadControls);
 
         async function onOpenCamera() {
-            device = await openCamera();
+            device = await sub2r.openCamera();
             await reloadControls();
+
 
 
             // await device.claimInterface(0);
         }
 
         async function reloadControls() {
-            await setVersionInfo('fx3Version');
-            await setVersionInfo('fpgaVersion');
+            let r = await sub2r.bulkReadColorGrading(sub2r.colorGrading.hueVhue)
+            console.log(r)
+            // await setVersionInfo('fx3Version');
+            // await setVersionInfo('fpgaVersion');
 
-            await setLedControl("Red");
-            await setLedControl("Green");
-            await setLedControl("Blue");
+            // await setLedControl("Red");
+            // await setLedControl("Green");
+            // await setLedControl("Blue");
             
-            await setFanControl();
+            // await setFanControl();
         }
 
         

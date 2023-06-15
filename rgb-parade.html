@@ -1,0 +1,569 @@
+<html>
+
+<head>
+    <script src="sub2r.js"></script>
+    <script src="sub2r-sensors.js"></script>
+    <style>
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .app-top {
+            flex: 1 1 auto;
+            position: relative;
+        }
+
+        .app-bottom {
+            height: 250px;
+            margin-top: 10px;
+        }
+
+        video {
+            background: #222;
+            margin: 0 0 20px 0;
+            width: 600px;
+            height: 400px;
+        }
+
+        #container {
+            margin: 5;
+            display: flex;
+        }
+
+        #controls {
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        #controls>div {
+            margin: 5;
+            padding: 5;
+            display: flex;
+            flex-direction: column;
+            flex: 1 1 0px;
+        }
+
+        #controls .label {
+            height: 2em;
+        }
+
+        .min-max {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10;
+        }
+
+        .ctrl-value {
+            font-size: 14;
+        }
+
+        .sensors {
+            display: grid;
+            grid-template-columns: max-content auto 1fr auto;
+            grid-gap: 5px;
+            font-size: 0.8em;
+        }
+
+        .sensors input[type=number] {
+            max-width: 5em;
+        }
+
+        .sensors .on {
+            background-color: #cce4f7;
+            border: 1px #005499 solid;
+            border-radius: 6px;
+        }
+
+        .sensors .off {
+            background-color: #fdfdfd;
+            border: 1px #bababa solid;
+            border-radius: 6px;
+        }
+
+        .sensors .off:hover {
+            border-color: #005499;
+        }
+
+        .sensors .c1 {
+            padding: 3 5;
+        }
+
+        .sensors .rgb-caption {
+            pointer-events: none;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .r1 {
+            grid-row: 1
+        }
+
+        .r2 {
+            grid-row: 2
+        }
+
+        .r3 {
+            grid-row: 3
+        }
+
+        .r4 {
+            grid-row: 4
+        }
+
+        .r5 {
+            grid-row: 5
+        }
+
+        .r6 {
+            grid-row: 6
+        }
+
+        .r7 {
+            grid-row: 7
+        }
+
+        .c1 {
+            grid-column: 1
+        }
+
+        .c2 {
+            grid-column: 2
+        }
+
+        .c3 {
+            grid-column: 3
+        }
+
+        .c4 {
+            grid-column: 4
+        }
+
+        .c5 {
+            grid-column: 5
+        }
+
+        .cs2 {
+            grid-column-end: span 2;
+        }
+
+        .pointer {
+            cursor: pointer;
+        }
+
+        input[type=number]::-webkit-inner-spin-button {
+            opacity: 1
+        }
+
+        .slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 6px;
+            border: solid 2px #d3d3d3;
+            border-radius: 3px;
+            margin-top: 10px;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 10px;
+            height: 20px;
+            margin-top: -5px;
+
+            border: 0;
+            background: url("data:image/svg+xml,<svg width='10' height='20'  viewBox='0 0 20 40' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M10,0 L20,10 20,40 0,40 0,10z' fill='blue'/></svg>");
+            cursor: pointer;
+        }
+
+        input[type=range]:disabled::-webkit-slider-thumb {
+            background: url("data:image/svg+xml,<svg width='10' height='20'  viewBox='0 0 20 40' fill='none' xmlns='http://www.w3.org/2000/svg'><path d='M10,0 L20,10 20,40 0,40 0,10z' fill='gray'/></svg>");
+        }
+
+        .thumb-right::-webkit-slider-thumb {
+            transform: rotate(45deg);
+        }
+
+        .thumb-bottom::-webkit-slider-thumb {
+            transform: rotate(180deg);
+            margin-top: 0px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app">
+        <div class="app-top">
+
+            <div style="position: absolute;height: 100%;display: flex;">
+                <video id="gum-local" style="height: 100%;max-height: 600px;margin: 5;" autoplay=""
+                    playsinline=""></video>
+                <div style="margin: 5;">
+                    <button id="rgb-parade-button">RGB parade</button>
+                    <div style="margin: 5;height: 310;width:450px;position: relative;">
+
+                        <svg
+                            style="position: absolute;top: 0;left: 0;height: 100%;width: 100%;background-color: transparent;">
+                            <style>
+                                .num {
+                                    font-size: 12px;
+                                    text-anchor: end;
+                                    alignment-baseline: middle;
+                                    fill: #bbbb00;
+                                }
+                            </style>
+                            <path d="M40,290 V0" stroke="#bbbb00" stroke-width="1"></path>
+                            <path d="M40,10 h410 m-410,70 h410 m-410,70 h410 m-410,70 h410 m-410,70 h410"
+                                stroke="#bbbb00" stroke-width="1"></path>
+                            <path d="M40,45 h410 m-410,70 h410 m-410,70 h410 m-410,70 h410" stroke="#bbbb00"
+                                stroke-width="1" stroke-dasharray="6 5"></path>
+                            <path stroke-dasharray="6 5" stroke-width="1" stroke="#bbbb00"
+                                d="M40,290 v5 m8,-5 v3 m8,-3 v3 m8,-3 v3 m8,-3 v5 m8,-5 v3 m8,-3 v3 m8,-3 v3 m8,-3 v5 m8,-5 v3 m8,-3 v3 m8,-3 v3 m8,-3 v5  m8,-5 v3 m8,-3 v3 m8,-3 v3 m8,-3 v5M178,290 v5 m8,-5  v3 m8,-3 v3 m8,-3 v3 m8,-3 v5 m8,-5 v3 m8,-3 v3 m8,-3 v3 m8,-3 v5 m8,-5 v3 m8,-3 v3 m8,-3 v3 m8,-3 v5  m8,-5 v3 m8,-3 v3 m8,-3 v3 m8,-3 v5M316,290 v5 m8,-5  v3 m8,-3 v3 m8,-3 v3 m8,-3 v5 m8,-5 v3 m8,-3 v3 m8,-3 v3 m8,-3 v5 m8,-5 v3 m8,-3 v3 m8,-3 v3 m8,-3 v5  m8,-5 v3 m8,-3 v3 m8,-3 v3 m8,-3 v5">
+                            </path><text class="num" x="38" y="10">256</text><text class="num" x="38"
+                                y="45">224</text><text class="num" x="38" y="80">192</text><text class="num" x="38"
+                                y="115">160</text><text class="num" x="38" y="150">128</text><text class="num" x="38"
+                                y="185">96</text><text class="num" x="38" y="220">64</text><text class="num" x="38"
+                                y="255">32</text><text class="num" x="38" y="290">0</text>
+                        </svg>
+                        <canvas id="rgb-parade" style="margin: 0;width: 100%;height: 100%;padding: 0;"> </canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="app-bottom">
+            camera: <select id="videoSource" style="width:200px;"></select>
+            <button id="open-usb-sub2r" style="margin-left:10px">SUB2r USB3 HD Camera</button>
+            <div id="container">
+                <div>
+                    <div class="sensors">
+                        <div class="r1 c1 text-right">Binning</div>
+                        <div class="r1 c2 cs2">
+                            <select id="binning-type" style="margin-top:4px">
+                                <option value="0">V-sum, H-sum</option>
+                                <option value="1">V-sum, H-avg</option>
+                                <option value="2">V-avg, H-sum</option>
+                                <option value="3">V-avg, H-avg</option>
+                            </select>
+                        </div>
+                        <div id="rgb-on-off" class="on" style="grid-row: 2 / span 3;grid-column: 1;"></div>
+                        <div class="r2 c1 rgb-caption ">Red</div>
+                        <input id="slider-red" class="r2 c2 cs2 slider thumb-bottom" type="range" style="width:300px">
+                        <input id="edit-red" class="r2 c4" type="number">
+                        <div class="r3 c1 rgb-caption ">Green</div>
+                        <input id="slider-green" class="r3 c2 cs2 slider thumb-bottom" type="range">
+                        <input id="edit-green" class="r3 c4" type="number">
+                        <div class="r4 c1 rgb-caption">Blue</div>
+                        <input id="slider-blue" class="r4 c2 cs2 slider thumb-bottom" type="range">
+                        <input id="edit-blue" class="r4 c4" type="number">
+                        <div id="gain-on-off" class="r5 c1 text-center pointer off">Gain</div>
+                        <input id="slider-gain" class="r5 c2 cs2 slider thumb-bottom" type="range">
+                        <input id="edit-gain" class="r5 c4" type="number">
+                        <div id="exposure-on-off" class="r6 c1 text-center pointer off">Exposure</div>
+                        <select id="exposure-range" class="r6 c2" style="margin-top:4px">
+                            <option value="0">0-9K</option>
+                            <option value="1">6K-18K</option>
+                            <option value="2">14K-35K</option>
+                            <option value="3">30K-max</option>
+                        </select>
+                        <input id="slider-exposure" class="r6 c3 slider thumb-bottom" type="range">
+                        <input id="edit-exposure" class="r6 c4" type="number">
+                        <div class="r7 c1 text-right">Black level</div>
+                        <input id="slider-black" class="r7 c2 cs2 slider thumb-bottom" type="range">
+                        <input id="edit-black" class="r7 c4" type="number">
+                    </div>
+                </div>
+                <!-- <button id="start-capture">start capture</button>
+        <button id="stop-capture">stop cupture</button>
+        <input type="checkbox" id="flip-flop"> flip
+        <div id="message"></div>
+
+        <div id="errorMsg"></div>
+        <input type="range" min="1" max="2000" value="150" id="xavg" style="width:400px"> -->
+
+
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    let sensorValues;
+    const sub2rSensor = Sub2rSensors({
+        container: document.querySelector('.sensors'),
+        onChangeValue: (name, value) => {
+            if (!sub2r.device) return;
+            sub2r.writeSensor(name, value);
+        }
+
+    });
+    document.querySelector('#open-usb-sub2r').addEventListener('click', async () => {
+        await sub2r.openCamera();
+        sensorsValues = await sub2r.bulkReadSensors();
+        sub2rSensor.changeValues({...sensorsValues});
+    })
+
+    let video = document.querySelector("video");
+    // for (p in video) if (p.startsWith('on')) {
+    //     video[p] = (e) => console.log('p',e); 
+    // }
+
+    video.addEventListener('wheel', (e) => console.log(e))
+
+    var videoElement = document.querySelector('video');
+    var videoSelect = document.querySelector('select#videoSource');
+    let percent = 50;
+    let timer;
+    document.querySelector('#rgb-parade-button').addEventListener('click', () => {
+        if (timer) {
+            clearInterval(timer);
+            timer = null;
+        } else {
+            timer = setInterval(() => {
+                drawParade();
+            }, 200);
+        }
+        // takepicture();
+        // drawParade();
+    })
+    // document.querySelector('#xavg').addEventListener('input', () => {
+    //     percent = Number.parseInt(document.querySelector('#xavg').value);
+    //     console.log("percent", percent)
+    //     redraw();
+    // })
+
+    videoSelect.onchange = getStream;
+
+    getStream().then(getDevices).then(gotDevices);
+
+    function getDevices() {
+        // AFAICT in Safari this only gets default devices until gUM is called :/
+        return navigator.mediaDevices.enumerateDevices();
+    }
+
+    function gotDevices(deviceInfos) {
+        window.deviceInfos = deviceInfos; // make available to console
+        console.log('Available input and output devices:', deviceInfos);
+        for (const deviceInfo of deviceInfos) {
+            const option = document.createElement('option');
+            option.value = deviceInfo.deviceId;
+            if (deviceInfo.kind === 'videoinput') {
+                option.text = deviceInfo.label || `Camera ${videoSelect.length + 1}`;
+                videoSelect.appendChild(option);
+            }
+        }
+    }
+
+    function getStream() {
+        if (window.stream) {
+            window.stream.getTracks().forEach(track => {
+                track.stop();
+            });
+        }
+        const videoSource = videoSelect.value;
+        const constraints = {
+            video: { deviceId: videoSource ? { exact: videoSource } : undefined }
+        };
+        return navigator.mediaDevices.getUserMedia(constraints).
+            then(gotStream).catch(handleError);
+    }
+
+    function gotStream(stream) {
+        window.stream = stream; // make stream available to console
+        videoSelect.selectedIndex = [...videoSelect.options].
+            findIndex(option => option.text === stream.getVideoTracks()[0].label);
+        videoElement.srcObject = stream;
+    }
+
+    function handleError(error) {
+        console.error('Error: ', error);
+    }
+
+    let i = 0;
+    let canvas;
+    let parade;
+    function takepicture() {
+        if (!canvas) {
+            canvas = document.createElement('canvas');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            histogram = document.querySelector('#histogram');
+            histogram.width = 256;
+            histogram.height = 256;
+        }
+        const context = canvas.getContext("2d");
+        const width = canvas.width;
+        const height = canvas.height;
+
+        context.drawImage(videoElement, 0, 0, width, height);
+        i++;
+        document.querySelector('#message').innerHTML = i;
+        const data = context.getImageData(0, 0, width, height).data
+        window.data = data;
+        const rr = new Int32Array(256);
+        const gg = new Int32Array(256);
+        const bb = new Int32Array(256);
+        const ln = data.byteLength;
+        for (let i = 0; i < ln; i += 4) {
+            rr[data[i]]++;
+            gg[data[i + 1]]++;
+            bb[data[i + 2]]++;
+        }
+        drawHistogram(rr, gg, bb);
+    }
+
+    function drawHistogram(rr, gg, bb) {
+        let mx = Math.max(...rr, ...gg, ...bb);
+        const scale = histogram.height / mx;
+        const ctx = histogram.getContext("2d");
+        ctx.clearRect(0, 0, histogram.width, histogram.height);
+        drawHistogramColor(ctx, rr, scale, '#FF000080');
+        drawHistogramColor(ctx, gg, scale, '#00FF0080');
+        drawHistogramColor(ctx, bb, scale, '#0000FF80');
+    }
+    function drawHistogramColor(ctx, arr, scale, color) {
+        ctx.beginPath();
+        for (let x = 0; x < 256; x++) {
+            ctx.moveTo(x, 255);
+            ctx.lineTo(x, 255 - Math.floor(arr[x] * scale));
+        }
+
+        ctx.strokeStyle = color;
+        ctx.stroke();
+    }
+
+
+    function captureCamera() {
+        if (!canvas) {
+            canvas = document.createElement('canvas');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            parade = document.querySelector('#rgb-parade');
+            parade.width = parade.getClientRects()[0].width;
+            parade.height = parade.getClientRects()[0].height;
+            const ctx = parade.getContext("2d");
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, parade.width, parade.height);
+
+        }
+        const context = canvas.getContext("2d");
+        const width = canvas.width;
+        const height = canvas.height;
+
+        context.drawImage(videoElement, 0, 0, width, height);
+        return context.getImageData(0, 0, width, height).data
+    }
+
+    function drawParade() {
+        const data = captureCamera();
+        const w = 256;
+        const h = 256;
+        const stat = paradeStatCollect(data, videoElement.videoWidth, videoElement.videoHeight);
+
+        const rr = getParadeRGBImage(stat.rr, stat.avg, 'red');
+        const gg = getParadeRGBImage(stat.gg, stat.avg, 'green');
+        const bb = getParadeRGBImage(stat.bb, stat.avg, 'blue');
+        const paradeHeight = parade.getClientRects()[0].height - 30;
+        parade.getContext("2d").drawImage(rr, 0, 0, w, h, 40, 10, 128, paradeHeight);
+        parade.getContext("2d").drawImage(gg, 0, 0, w, h, 178, 10, 128, paradeHeight);
+        parade.getContext("2d").drawImage(bb, 0, 0, w, h, 316, 10, 128, paradeHeight);
+    }
+
+    function getParadeRGBImage(arr, avg, color) {
+        const w = 256;
+        const h = 256;
+        const ln = w * h * 4;
+        const shift = color === "red" ? 0 : color === 'green' ? 1 : 2;
+        const buffer = new Uint8Array(ln);
+        const avg2 = avg * 2;
+        const avg4 = avg * 10;
+        let buffPos = ln - w * 4;
+        let endLine = ln;
+        arr.forEach(v => {
+            buffer[ln - buffPos + 3] = 255;
+
+            if (v > avg2) {
+                const vv = v > avg4 ? 255 : Math.floor(v / avg4 * 256);
+                buffer[buffPos] = vv;
+                buffer[buffPos + 1] = vv;
+                buffer[buffPos + 2] = vv;
+                buffer[buffPos + shift] = 255;
+            } else {
+                buffer[buffPos + shift] = Math.floor(v / avg2 * 256);
+            }
+
+            buffPos += 4;
+            if (buffPos === endLine) {
+                endLine -= w * 4;
+                buffPos = endLine - w * 4;
+            }
+        })
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        const idata = ctx.createImageData(w, h);
+        idata.data.set(buffer);
+
+        ctx.putImageData(idata, 0, 0);
+        return canvas;
+
+    }
+
+    function getImage(buffer, width, height) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const idata = ctx.createImageData(width, height);
+        idata.data.set(buffer);
+        ctx.putImageData(idata, 0, 0);
+        return canvas;
+    }
+
+    function paradeStatCollect(data, width, height) {
+        const rr = new Int32Array(256 * 256);
+        const gg = new Int32Array(256 * 256);
+        const bb = new Int32Array(256 * 256);
+
+        const columnWidth = width / 256;
+        const columnWidthMin = Math.floor(columnWidth);
+
+        for (let col = 0; col < 256; col++) {
+            let xstart = Math.floor(col * columnWidth);
+            let xend = Math.floor((col + 1) * columnWidth);
+            const one = columnWidthMin === (xend - xstart) ? columnWidthMin + 1 : columnWidthMin;
+            for (let y = 0; y < height; ++y) {
+                const xs = (y * width + xstart) * 4;
+                const xe = (y * width + xend) * 4;
+                for (let x = xs; x < xe; x += 4) {
+                    rr[data[x] * 256 + col] += one;
+                    gg[data[x + 1] * 256 + col] += one;
+                    bb[data[x + 2] * 256 + col] += one;
+                }
+            }
+        }
+
+        const avg = Math.floor(columnWidthMin * (columnWidthMin + 1) * height / 256);
+        return {
+            rr, gg, bb, avg
+        }
+
+    }
+
+
+</script>
+
+</html>

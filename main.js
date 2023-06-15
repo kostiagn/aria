@@ -1,4 +1,5 @@
 //Shift + Alt + F - autoformat
+function ColorGradingTabs(isTest) {
 const EPSILON = 1.0e-5;
 // /https://learn.javascript.ru/bezier
 //https://habr.com/ru/articles/264191/
@@ -66,6 +67,9 @@ function normalizePoint(point) {
     return r;
 }
 
+const delay = async (delayInms) => {
+    return new Promise(resolve => setTimeout(resolve, delayInms));
+  }
 
 
 
@@ -118,7 +122,7 @@ $(() => {
             })
         }
     });
-    selectTab(1, 0);
+    selectTab(1, 1);
 
     function selectTab(tab1, tab2) {
         if (selectedTab && selectedTab.obj && selectedTab.obj.deactivate) selectedTab.obj.deactivate();
@@ -144,18 +148,24 @@ $(() => {
 
 });
 
-
+function removeAllListeners(el) {
+    const clone = el.cloneNode(true);
+    el.parentNode.replaceChild(clone, el);
+    return clone;
+}
 
 function bindAll(obj) {
-    console.log("bind all")
     for (let prop in obj) {
         if (typeof obj[prop] === 'function') {
-            console.log("prop", prop)
             obj[prop] = obj[prop].bind(obj);
         }
     }
 }
-
+ 
+function removeAllAndAddListener(querySelector, eventName, listener) {
+    const el = removeAllListeners(document.querySelector(querySelector));
+    el.addEventListener(eventName,listener);
+}
 
 
 const colorGrading = {
@@ -173,7 +183,6 @@ const colorGrading = {
         this.width = width;
         this.height = height;
 
-        console.log(this)
         this.creatingImage();
 
         const canvas = document.createElement('canvas');
@@ -197,6 +206,8 @@ const colorGrading = {
         this.buffer[this.buffPos++] = 255;
     },
     activate: function () {
+        if (!this.sub2rColorGrading) throw `not set the field sub2rColorGrading for the tab '${this.title}'`;
+
         const curveMargin = 6;
         const curveEl = $('#curves');
         this.curveEl = curveEl;
@@ -204,7 +215,7 @@ const colorGrading = {
         const parent = curveEl.parent();
 
         const curveHeight = Math.floor(parent.height()) - curveMargin * 2;
-        const curveWidth = curveHeight * 3;
+        const curveWidth = curveHeight * 3.2;
         curveEl.width(curveWidth + curveMargin * 2);
         curveEl.height(parent.height());
 
@@ -217,8 +228,120 @@ const colorGrading = {
         // pointShift = netMargin - circleShift;
         const imageUrl = this.createImage(curveWidth, curveHeight);
         $(curveEl).find('[data-type="background"]').attr("href", imageUrl);
-        Curve(curveEl[0], this.tabTitle, curveWidth, curveHeight)
+        let values = [];
+        
+        const devValueEl = document.getElementById("dev-value");
+        
+        
+
+        this.loadValues(this.sub2rColorGrading).then(vals => {
+            
+            values = [...vals];
+            let curve = Curve({
+                canvasEl: curveEl[0], 
+                title: this.tabTitle, 
+                width: curveWidth, 
+                height: curveHeight,
+                values: [...vals],
+                topVal: this.topVal,
+                bottomVal: this.bottomVal,
+                areMissedSlidersVisible: document.querySelector('#show-missed-sliders').checked,
+                onValuesChanged: (vals) => {
+                    if (!vals.some((v,i) => Math.abs(values[i] - v) > 0.05)) return;
+                    values = [...vals];
+                    this.uploadValues(values);
+                },
+                onMouseMove: (sliderNum, sliderValue, valueUnderMouse) => {
+                    document.getElementById("slider-number").innerHTML = sliderNum;
+                    document.getElementById("slider-value").innerHTML = Math.round(sliderNum * 360 / 64);
+                    
+                    const mn = Math.min(this.topVal, this.bottomVal);
+                    const mx = Math.max(this.topVal, this.bottomVal);
+                    const r = mx > 100 ? 10 : 100;
+                    
+                    let v = !this.convertValueToDev ? sliderValue : this.convertValueToDev(sliderValue);
+                    v = v < mn ? mn : v > mx ? mx : v;
+                    document.getElementById("dev-value").value = Math.round(v * r) / r;
+
+                    v = !this.convertValueToDev ? valueUnderMouse : this.convertValueToDev(valueUnderMouse);
+                    v = v < mn ? mn : v > mx ? mx : v;
+                    document.getElementById("dev-under-mouse-value").innerHTML = Math.round(v * r) / r;
+
+                }
+            });
+
+            removeAllAndAddListener('#reload-values', 'click', async () => {
+                values = await this.loadValues(this.sub2rColorGrading);
+                curve.changeValues([...values]);
+            })
+
+            removeAllAndAddListener('#convert-to-curve', 'click', () => {
+                curve.convertToCurve();
+            });
+
+            removeAllAndAddListener('#convert-to-sliders', 'click', () => {
+                curve.convertToSliders();
+            })
+
+            removeAllAndAddListener('#neutral-color-grading', 'click', () => {
+                let vals = [];
+                const n = Math.abs(this.bottomVal + this.topVal)/2;
+                for (let i = 0; i < 64; i++) {
+                    vals[i] = n;//i / 64 * 360 - 180; 
+                }
+                values = [...vals];
+                this.uploadValues(vals);
+                curve.changeValues(vals);
+            })
+
+            removeAllAndAddListener('#default-color-grading', 'click', () => {
+                let vals = !this.convertValueFromDev ? [...this.sliderDefault] : this.sliderDefault.map((v) => this.convertValueFromDev(v));
+                values = [...vals];
+                this.uploadValues(vals);
+                curve.changeValues(vals);
+            })
+
+            removeAllAndAddListener('#show-missed-sliders', 'click', () => {
+                curve.showMissedSliders(document.querySelector('#show-missed-sliders').checked);
+            })
+
+            
+
+            dev-under-mouse-value
+            // vals = vals.map((v) => this.convertValueToDev(v));
+                    // vals.map((v) => this.convertValueFromDev(v));
+                    // curve.changeValues([...vals]);
+        })
+        
     },
+    
+    loadValues: async function () {
+        const values = await sub2r.bulkReadColorGrading(this.sub2rColorGrading);
+        return !this.convertValueFromDev ? values : values.map((v) => this.convertValueFromDev(v));
+    },
+
+    uploadValues: function (vals) {
+        if (this.uploadValuesInProgress) {
+            this.nextUploadValues = vals;
+            return;
+        }
+        this.uploadValuesInProgress = true;
+        vals = !this.convertValueToDev ? vals : vals.map((v) => this.convertValueToDev(v));
+        
+        sub2r.bulkWriteColorGrading(this.sub2rColorGrading, vals).then(() => {
+            setTimeout(() => {
+                this.uploadValuesInProgress = false;
+                
+                if (this.nextUploadValues) {
+                    const nv = this.nextUploadValues;
+                    this.nextUploadValues = null;
+                    this.uploadValues(nv);
+                }
+            }, 200);
+        });
+    },
+    
+
     deactivate: function () {
         this.curveEl.addClass('hide');
     }
@@ -228,49 +351,52 @@ const colorGradingHvH = {
 
     title: "Hue vs. Hue",
     tabTitle: "HvH",
+    sub2rColorGrading: 'hueVhue',
     valueY: 3600,
     neutralY: 3600 / 2,
     slidingScaleFactor: 2.7,
+    topVal: -180,
+    bottomVal: 180,
+    sliderDefault: [
+        -3.50, -4.90, +0.00, +0.00, +0.00, +4.00, +1.90, +0.00  // 0..7
+      , +0.00, +0.00, +0.00, +0.00, +0.00, +0.00, +0.00, +0.00  // 8..15
+      , +0.00, +0.00, +0.00, +0.00, -0.50, -5.30, -11.1, -16.7  // 16..23
+      , -5.70, -5.60, -11.1, -16.9, -20.4, -18.7, -17.9, -4.30  // 24..31
+      , +0.00, +0.00, +0.00, +0.00, -0.70, -1.70, -2.30, -2.80  // 32..39
+      , -3.60, -6.70, -16.8, -1.10, +0.00, +0.00, +0.00, +0.00  // 40..47
+      , +0.00, +0.00, +0.00, +0.00, +0.00, +0.00, +0.00, +0.00  // 48..55
+      , +0.00, +0.00, +0.00, +0.00, +0.00, +0.00, -0.90, -5.60  // 56..63
+    ],
 
-    posToValY: function (pos) {
-        if (Math.abs(pos) < EPSILON) {
-            return 0;
-        }
-        const d = Math.abs(this.neutralY - pos);
-        if (pos >= this.valueY || d < EPSILON) {
-            return pos;
-        }
-
-
-        const tmp = Math.pow(this.neutralY, 1 - this.slidingScaleFactor) * Math.pow(d, this.slidingScaleFactor);
-        return pos < this.neutralY ? this.neutralY - tmp : this.neutralY + tmp;
+    convertValueFromDev: function(v) {
+        const tmp = 180 * Math.pow(Math.abs(v/180), 1/this.slidingScaleFactor);
+        return v < 0 ? -tmp : tmp;
     },
 
-    valToDev: function (val) {
-        return val / 10 - 180;
+    convertValueToDev: function (v) {
+        const tmp = 180 * Math.pow(Math.abs(v/180), this.slidingScaleFactor);
+        return v < 0 ? -tmp : tmp;
     },
 
-    rotation: function (y) {
-        const offset = 360 * (y - this.height / 2) / this.height * this.valueY / 2 / 180 + this.valueY / 2;
-        return this.valToDev(this.posToValY(offset));
-    },
     creatingImage: function () {
         const halfHeight = this.height / 2;
+        const mx = 360 / this.width; 
+        const my = 360 / this.height; 
 
         for (let y = 0; y < this.height; ++y) {
             const distance = Math.abs(y - halfHeight);
             const center = distance <= this.rectCenterHeight;
             const luma = center ? 200 : 90 + 80 * distance / halfHeight;
+            const dhue = center ? 0 : this.convertValueToDev(y * my - 180);
             for (let x = 0; x < this.width; ++x) {
-                const hue = (360 * x / this.width);
-                const hue2 = hue + (center ? 0 : this.rotation(y));
-                this.addNextPointHsv(hue2, 255, luma);
+                const hue = (x * mx);
+                this.addNextPointHsv( hue + dhue, 255, luma);
             }
 
         }
     }
 }
-registerTab("Curves", colorGradingHvH);
+
 
 const colorGradingHvL = {
     __proto__: colorGrading,
@@ -297,29 +423,51 @@ const colorGradingHvL = {
     }
 }
 
-registerTab("Curves", colorGradingHvL);
+
 
 const colorGradingHvS = {
     __proto__: colorGrading,
     tabTitle: "HvS",
     title: "Hue vs. Saturation",
-    valueX: 0,
-    valueY: 300,
-    valToDev: function (val) {
-        return (3 - val) * 100;
-    },
+    sub2rColorGrading: 'hueVsat',
+    topVal: 3,
+    bottomVal: 0,
+    sliderDefault: [
+          0.65, 0.65, 0.65, 0.65, 1.00, 1.22, 1.41, 1.56  // 0..7
+        , 1.71, 2.05, 2.28, 2.78, 2.78, 2.78, 2.78, 2.78  // 8..15
+        , 2.78, 2.78, 2.78, 2.78, 2.78, 2.78, 2.78, 2.78  // 16..23
+        , 2.78, 2.78, 2.78, 2.78, 2.78, 2.78, 2.32, 1.75  // 24..31
+        , 1.61, 1.61, 1.61, 1.61, 1.61, 1.61, 1.61, 1.61  // 32..39
+        , 1.61, 1.61, 1.61, 1.61, 1.61, 1.61, 1.61, 1.61  // 40..47
+        , 1.61, 1.61, 1.61, 1.61, 2.21, 2.21, 2.21, 2.21  // 48..55
+        , 2.17, 2.17, 2.17, 2.21, 1.00, 1.00, 0.65, 0.65  // 56..63
+    ],
+
+    // convertValueFromDev: function(v) {
+    //     return v * 100;
+    // },
+
+    // convertValueToDev: function (v) {
+    //     return v / 100;
+    // },
+
     creatingImage: function () {
+        const mx = 360 / this.width;
+        
         for (let y = 0; y < this.height; ++y) {
+            const saturation = (this.height - y) * 255 / this.height;
             for (let x = 0; x < this.width; ++x) {
-                const hue = x * 359 / this.width;
-                const saturation = (this.height - y) * 255 / this.height;
+                const hue = x * mx;
+                
                 this.addNextPointHsv(hue, saturation, saturation);
             }
         }
     }
 }
 
+registerTab("Curves", colorGradingHvH);
 registerTab("Curves", colorGradingHvS);
+// registerTab("Curves", colorGradingHvL);
 
 
 
@@ -338,3 +486,4 @@ registerTab("Curves", colorGradingHvS);
 
 
 
+}
