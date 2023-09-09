@@ -215,7 +215,7 @@ const colorGrading = {
         const parent = curveEl.parent();
 
         const curveHeight = Math.floor(parent.height()) - curveMargin * 2;
-        const curveWidth = curveHeight * 3.2;
+        const curveWidth = Math.floor(curveHeight * 3.2);
         curveEl.width(curveWidth + curveMargin * 2);
         curveEl.height(parent.height());
 
